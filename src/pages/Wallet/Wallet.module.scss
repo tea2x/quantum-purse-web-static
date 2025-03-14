@@ -1,0 +1,99 @@
+.wallet {
+  :global {
+
+    display: flex;
+    flex-direction: column;
+
+    .account-list {
+      display: flex;
+      flex-direction: column;
+
+      .divider {
+        margin: 0;
+        border-block-start-color: var(--gray-light);
+        width: 96%;
+        min-width: 96%;
+        margin: 0 auto;
+      }
+    }
+  }
+}
+
+.accountList {
+  overflow: auto;
+  max-height: 100%;
+}
+
+.accountUtils {
+  :global {
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      color: var(--gray-03) !important;
+      &:hover {
+        color: var(--teal-2) !important;
+      }
+    }
+  }
+}
+
+.accountItem {
+  border-radius: 1rem;
+  padding: 0.6rem 1.6rem;
+  // background-color: var(--white-abs);
+  transition: background-color 0.3s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+  border: solid 0.1rem transparent;
+
+  :global {
+    .account-info {
+      display: flex;
+      flex-direction: column;
+      .name {
+        font-size: 1.4rem;
+        font-weight: 600;
+        line-height: 1.5;
+        color: var(--gray-03);
+
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+
+        .current {
+          padding: 0.4rem 0.8rem;
+          font-size: 1rem;
+          line-height: 1.2;
+        }
+      }
+      .address {
+        font-size: 1.2rem;
+        line-height: 1.2;
+        font-family: "Quantico", sans-serif;
+        color: var(--gray-02);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem;
+        margin-left: -0.4rem;
+        border-radius: 0.4rem;
+
+        &.copyable {
+          transition: background-color 0.3s ease;
+          &:hover {
+            background-color: var(--gray-light);
+          }
+        }
+      }
+    }
+
+    .more-btn {
+      padding: 0;
+      width: 3.2rem;
+      height: 3.2rem;
+    }
+  }
+}

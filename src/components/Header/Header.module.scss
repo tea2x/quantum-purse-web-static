@@ -1,0 +1,48 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  height: 6.4rem;
+  background-color: var(--teal-1);
+  border-radius: 0 0 1.2rem 1.2rem;
+  max-width: 128rem;
+  margin: 0 auto;
+  box-shadow: 0 0.4rem 0.4rem rgba(0, 0, 0, 0.25);
+
+  :global {
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      color: var(--white);
+      text-transform: uppercase;
+      font-family: "Quantico", sans-serif;
+      font-size: 2rem;
+
+      svg {
+        cursor: pointer;
+      }
+      p {
+        overflow: hidden;
+        white-space: nowrap;
+        border-right: 2px solid;
+        width: 0;
+        animation: typing 4s steps(13) infinite alternate,
+          blink-caret 0.75s step-end infinite;
+        margin: 0;
+        letter-spacing: 0.15em;
+      }
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+
+      svg {
+        color: var(--white);
+      }
+    }
+  }
+}

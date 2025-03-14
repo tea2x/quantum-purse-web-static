@@ -1,0 +1,32 @@
+.receiveContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 2.4rem;
+  background-color: var(--white);
+  border-radius: 1.2rem;
+  box-shadow: 0 0.2rem 0.8rem rgba(0, 0, 0, 0.05);
+  margin-top: 2rem;
+}
+
+.qrCodeContainer {
+  padding: 1.6rem;
+  background-color: white;
+  border-radius: 0.8rem;
+  box-shadow: 0 0.2rem 0.8rem rgba(0, 0, 0, 0.08);
+
+  svg {
+    display: block;
+  }
+}
+.address {
+  font-family: "Quantico", sans-serif;
+  font-size: 1.4rem;
+  color: var(--gray-02);
+  transition: color 0.3s ease-out;
+
+  &:hover {
+    color: var(--teal-2);
+  }
+}

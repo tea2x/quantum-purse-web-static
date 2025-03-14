@@ -1,0 +1,20 @@
+.layout {
+  max-width: 128rem;
+  margin: 0 auto;
+
+  :global(.container) {
+    padding: 1.2rem;
+  }
+
+  &.activeLayout {
+    :global {
+      @media (min-width: 768px) {
+        .container {
+          display: flex;
+          gap: 1.2rem;
+          max-height: calc(100vh - 6.4rem)
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+.sendForm {
+  :global {
+    .ant-form-item {
+      &.select-my-account {
+        .ant-select-selector {
+          min-height: 5.8rem;
+        }
+        .ant-select-single {
+          height: fit-content;
+        }
+      }
+
+      &.field-to {
+        label {
+          width: 100%;
+          .label-container {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            .switch-container {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+          }
+        }
+      }
+    }
+  }
+}

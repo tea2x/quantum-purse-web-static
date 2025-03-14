@@ -1,0 +1,17 @@
+.authentication {
+  :global {
+    .title {
+      text-align: center;
+      margin-bottom: 1.6rem;
+    }
+    .description {
+      text-align: center;
+      margin-bottom: 1.6rem;
+    }
+    .form-authentication {
+      .ant-form-item {
+        margin-bottom: 1.6rem;
+      }
+    }
+  }
+}

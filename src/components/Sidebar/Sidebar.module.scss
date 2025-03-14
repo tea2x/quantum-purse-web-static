@@ -1,0 +1,18 @@
+.sidebar {
+  height: fit-content;
+  flex-grow: 0;
+  padding: 0;
+
+  @media (max-width: 768px) {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    max-width: 50rem;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 768px) {
+    flex-basis: 20rem;
+  }
+}
