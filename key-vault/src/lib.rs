@@ -649,7 +649,7 @@ impl KeyVault {
             .await
             .map_err(|e| e.to_jsvalue())?;
         if stored_seed.is_some() {
-            debug!("[INFO]: Mnemonic phrase exists");
+            debug!("\x1b[37;44m INFO \x1b[0m \x1b[1mkey-vault\x1b[0m: mnemonic phrase exists");
             Ok(())
         } else {
             let entropy = get_random_bytes(32).unwrap(); // 256-bit entropy
@@ -676,12 +676,12 @@ impl KeyVault {
     /// - `password: Uint8Array` - The password used to decrypt the mnemonic phrase and encrypt the child private key.
     ///
     /// **Returns**:
-    /// - `Result<JsValue, JsValue>` - A JavaScript Promise that resolves to the hex-encoded SPHINCS+ public key on success,
+    /// - `Result<String, JsValue>` - A String Promise that resolves to the hex-encoded SPHINCS+ public key from the key pair on success,
     ///   or rejects with a JavaScript error on failure.
     ///
     /// **Async**: Yes
     #[wasm_bindgen]
-    pub async fn gen_new_key_pair(password: Uint8Array) -> Result<JsValue, JsValue> {
+    pub async fn gen_new_key_pair(password: Uint8Array) -> Result<String, JsValue> {
         let password = SecureVec::from_slice(&password.to_vec());
 
         // Get and decrypt the mnemonic seed phrase
@@ -710,7 +710,7 @@ impl KeyVault {
 
         // TODO check rng
 
-        Ok(JsValue::from_str(&encode(pub_key_clone.into_bytes())))
+        Ok(encode(pub_key_clone.into_bytes()))
     }
 
     /// Imports a mnemonic by encrypting it with the provided password and storing it as the mnemonic phrase.
@@ -753,6 +753,7 @@ impl KeyVault {
     /// **Async**: Yes
     ///
     /// **Warning**: Exporting the mnemonic exposes it in JavaScript, which may pose a security risk.
+    /// Proper zeroization of exported seed phrase is the responsibility of the caller.
     #[wasm_bindgen]
     pub async fn export_seed_phrase(password: Uint8Array) -> Result<Uint8Array, JsValue> {
         let password = SecureVec::from_slice(&password.to_vec());
