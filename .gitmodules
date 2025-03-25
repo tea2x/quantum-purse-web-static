@@ -1,0 +1,3 @@
+[submodule "rust-quantum-resistant-lock-script"]
+	path = rust-quantum-resistant-lock-script
+	url = https://github.com/tea2x/rust-quantum-resistant-lock-script.git
