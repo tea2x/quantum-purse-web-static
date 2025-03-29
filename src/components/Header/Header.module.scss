@@ -40,6 +40,12 @@
       align-items: center;
       gap: 1rem;
 
+      // just copy from header-left
+      color: var(--white);
+      text-transform: uppercase;
+      font-family: "Quantico", sans-serif;
+      font-size: 2rem;
+
       svg {
         color: var(--white);
       }

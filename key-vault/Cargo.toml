@@ -3,6 +3,10 @@ name = "key-vault"
 version = "0.1.0"
 edition = "2021"
 
+description = "A key processor library for Quantum Purse"
+repository = "https://github.com/tea2x/quantum-purse-web-static"
+license = "MIT"
+
 [lib]
 crate-type = ["cdylib"]
 

@@ -6,12 +6,15 @@ import { ROUTES } from "../../utils/constants";
 import { cx } from "../../utils/methods";
 import Icon from "../Icon/Icon";
 import styles from "./Header.module.scss";
+import { useSelector } from 'react-redux';
+import { RootState } from "../../store";
 
 const { useBreakpoint } = Grid;
 
 interface HeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const Header: React.FC<HeaderProps> = ({ className, ...rest }) => {
+  const syncStatus = useSelector((state: RootState) => state.wallet.syncStatus);
   const navigate = useNavigate();
   const { showSidebar, setShowSidebar } = useContext(LayoutCtx);
   const screens = useBreakpoint();
@@ -23,6 +26,11 @@ const Header: React.FC<HeaderProps> = ({ className, ...rest }) => {
         <p className={styles.text}>Quantum Purse</p>
       </div>
       <div className="header-right">
+        {syncStatus && (
+          <div>
+            Peers: {parseInt(syncStatus.connections.toString())} | Sync: {syncStatus.syncedStatus.toFixed(1)}%
+          </div>
+        )}
         {!screens.md && (
           <Button
             type="text"

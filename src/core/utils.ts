@@ -164,7 +164,11 @@ function get_ckb_tx_message_all_hash(tx: TransactionSkeletonType): Uint8Array {
         hash_type: input.cellOutput.lock.hashType,
         args: input.cellOutput.lock.args,
       },
-      type: input.cellOutput.type,
+      type: input.cellOutput.type ? {
+        code_hash: input.cellOutput.type?.codeHash,
+        hash_type: input.cellOutput.type?.hashType,
+        args: input.cellOutput.type?.args
+      } : null,
     },
     data: input.data,
     header: null,
@@ -213,11 +217,11 @@ function get_ckb_tx_message_all_hash(tx: TransactionSkeletonType): Uint8Array {
 }
 
 /**
- * Prepares signing entries for SPHINCS+ by hashing transaction data and witness information.
+ * Prepares entries for SPHINCS+ signing by hashing transaction data and witness information.
  * @param txSkeleton - The transaction skeleton to process.
  * @returns An updated transaction skeleton with signing entries.
  */
-export function prepareSphincsPlusSigningEntries(
+export function prepareSigningEntries(
   txSkeleton: TransactionSkeletonType
 ): TransactionSkeletonType {
   let processedArgs = Set<string>();
@@ -230,52 +234,13 @@ export function prepareSphincsPlusSigningEntries(
       const signingEntry = {
         type: "witness_args_lock",
         index: i,
-        message: uint8ArrayToHexString(get_ckb_tx_message_all_hash(txSkeleton)),
+        message: byteArrayToHex(get_ckb_tx_message_all_hash(txSkeleton)),
       };
       signingEntries = signingEntries.push(signingEntry);
     }
   }
   txSkeleton = txSkeleton.set("signingEntries", signingEntries);
   return txSkeleton;
-}
-
-/**
- * Sends a signed transaction to the CKB node.
- * @param nodeURL - The URL of the CKB node.
- * @param signedTx - The signed transaction to send.
- * @returns A promise resolving to the transaction ID.
- * @throws {Error} If there's an error sending the transaction, with detailed error information.
- */
-export async function sendTransaction(nodeURL: string, signedTx: Transaction) {
-  const rpc = new RPC(nodeURL, { fetch });
-
-  let txid = "";
-  try {
-    txid = await rpc.sendTransaction(signedTx);
-  } catch (error: any) {
-    const regex = /^(\w+): ([\w\s]+) (\{.*\})$/;
-    const matches = error.message.match(regex);
-
-    if (!!matches && matches.length > 0) {
-      const category = matches[1];
-      const type = matches[2];
-      const json = JSON.parse(matches[3]);
-
-      console.log();
-      console.error(`Error: ${category}`);
-      console.error(`Type: ${type}`);
-      console.error(`Code: ${json.code}`);
-      console.error(`Message: ${json.message}`);
-      console.error(`Data: ${json.data}`);
-      console.log();
-
-      throw new Error("RPC Returned Error!");
-    } else {
-      throw error;
-    }
-  }
-
-  return txid;
 }
 
 /**
@@ -317,7 +282,6 @@ export async function waitForConfirmation(
     throwOnNotFound: true,
   };
   options = { ...defaults, ...options };
-
   return new Promise(async (resolve, reject) => {
     let timedOut = false;
     const timeoutTimer =
@@ -330,17 +294,12 @@ export async function waitForConfirmation(
 
     while (true) {
       if (timedOut) return reject(Error("Transaction timeout."));
-
       const transaction = await rpc.getTransaction(txid);
-
       if (!!transaction) {
         const status = transaction.txStatus.status;
-
         updateProgress(status);
-
         if (status === "committed") {
           if (timeoutTimer) clearTimeout(timeoutTimer);
-
           break;
         }
       } else if (transaction === null) {
@@ -348,10 +307,8 @@ export async function waitForConfirmation(
           return reject(Error("Transaction was not found."));
         else updateProgress("not_found");
       }
-
       await new Promise((resolve) => setTimeout(resolve, options.recheckMs));
     }
-
     return resolve;
   });
 }
@@ -361,7 +318,7 @@ export async function waitForConfirmation(
  * @param hex - The hex string to convert.
  * @returns A Uint8Array representing the hex string.
  */
-export function hexStringToUint8Array(hex: string): Uint8Array {
+export function hexToByteArray(hex: string): Uint8Array {
   if (hex.startsWith("0x")) {
     hex = hex.slice(2);
   }
@@ -383,7 +340,7 @@ export function hexStringToUint8Array(hex: string): Uint8Array {
  * @param arr - The uint8 array to convert.
  * @returns A hex string.
  */
-export function uint8ArrayToHexString(arr: Uint8Array): string {
+export function byteArrayToHex(arr: Uint8Array): string {
   return (
     "0x" +
     Array.from(arr)

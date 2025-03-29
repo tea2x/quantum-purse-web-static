@@ -644,12 +644,12 @@ impl KeyVault {
     ///
     /// **Note**: Only effective when the mnemonic phrase is not yet set.
     #[wasm_bindgen]
-    pub async fn key_init(password: Uint8Array) -> Result<(), JsValue> {
+    pub async fn init_seed_phrase(password: Uint8Array) -> Result<(), JsValue> {
         let stored_seed = get_encrypted_mnemonic_phrase()
             .await
             .map_err(|e| e.to_jsvalue())?;
         if stored_seed.is_some() {
-            debug!("[INFO]: Mnemonic phrase exists");
+            debug!("\x1b[37;44m INFO \x1b[0m \x1b[1mkey-vault\x1b[0m: mnemonic phrase exists");
             Ok(())
         } else {
             let entropy = get_random_bytes(32).unwrap(); // 256-bit entropy
@@ -676,12 +676,12 @@ impl KeyVault {
     /// - `password: Uint8Array` - The password used to decrypt the mnemonic phrase and encrypt the child private key.
     ///
     /// **Returns**:
-    /// - `Result<JsValue, JsValue>` - A JavaScript Promise that resolves to the hex-encoded SPHINCS+ public key on success,
+    /// - `Result<String, JsValue>` - A String Promise that resolves to the hex-encoded SPHINCS+ public key from the key pair on success,
     ///   or rejects with a JavaScript error on failure.
     ///
     /// **Async**: Yes
     #[wasm_bindgen]
-    pub async fn gen_new_key_pair(password: Uint8Array) -> Result<JsValue, JsValue> {
+    pub async fn gen_new_key_pair(password: Uint8Array) -> Result<String, JsValue> {
         let password = SecureVec::from_slice(&password.to_vec());
 
         // Get and decrypt the mnemonic seed phrase
@@ -710,7 +710,7 @@ impl KeyVault {
 
         // TODO check rng
 
-        Ok(JsValue::from_str(&encode(pub_key_clone.into_bytes())))
+        Ok(encode(pub_key_clone.into_bytes()))
     }
 
     /// Imports a mnemonic by encrypting it with the provided password and storing it as the mnemonic phrase.
@@ -753,6 +753,7 @@ impl KeyVault {
     /// **Async**: Yes
     ///
     /// **Warning**: Exporting the mnemonic exposes it in JavaScript, which may pose a security risk.
+    /// Proper zeroization of exported seed phrase is the responsibility of the caller.
     #[wasm_bindgen]
     pub async fn export_seed_phrase(password: Uint8Array) -> Result<Uint8Array, JsValue> {
         let password = SecureVec::from_slice(&password.to_vec());
@@ -813,7 +814,7 @@ impl KeyVault {
     /// - `Result<Vec<String>, JsValue>` - A list of public keys as strings on success,
     ///   or a JavaScript error on failure.
     #[wasm_bindgen]
-    pub async fn search_accounts(
+    pub async fn gen_account_batch(
         password: Uint8Array,
         start_index: u32,
         count: u32,
@@ -825,13 +826,13 @@ impl KeyVault {
             .map_err(|e| e.to_jsvalue())?
             .ok_or_else(|| JsValue::from_str("Mnemonic phrase not found"))?;
         let seed = decrypt(&password, payload)?;
-        let mut key_list: Vec<String> = Vec::new();
+        let mut pub_keys: Vec<String> = Vec::new();
         for i in start_index..(start_index + count) {
             let (pub_key, _) = derive_sphincs_key(&seed, i)
                 .map_err(|e| JsValue::from_str(&format!("Key derivation error: {}", e)))?;
-            key_list.push(encode(pub_key.into_bytes()));
+            pub_keys.push(encode(pub_key.into_bytes()));
         }
-        Ok(key_list)
+        Ok(pub_keys)
     }
 
     /// Supporting wallet recovery - Recovers the wallet by deriving and storing private keys for the first N accounts.
@@ -841,21 +842,24 @@ impl KeyVault {
     /// - `count: u32` - The number of accounts to recover (from index 0 to count-1).
     ///
     /// **Returns**:
-    /// - `Result<(), JsValue>` - Ok on success, or a JavaScript error on failure.
+    /// - `Result<(), JsValue>` - A list of newly generated sphincs+ public keys on success, or a JavaScript error on failure.
     ///
     /// **Async**: Yes
     #[wasm_bindgen]
-    pub async fn recover_wallet(password: Uint8Array, count: u32) -> Result<(), JsValue> {
+    pub async fn recover_accounts(password: Uint8Array, count: u32) -> Result<Vec<String>, JsValue> {
         let password = SecureVec::from_slice(&password.to_vec());
         // Get and decrypt the mnemonic seed phrase
         let payload = get_encrypted_mnemonic_phrase()
             .await
             .map_err(|e| e.to_jsvalue())?
             .ok_or_else(|| JsValue::from_str("Mnemonic phrase not found"))?;
+        let mut pub_keys: Vec<String> = Vec::new();
         let seed = decrypt(&password, payload)?;
         for i in 0..count {
             let (pub_key, pri_key) = derive_sphincs_key(&seed, i)
                 .map_err(|e| JsValue::from_str(&format!("Key derivation error: {}", e)))?;
+
+            let pub_key_clone = pub_key.clone();
             let pri_key_bytes = SecureVec::from_slice(&pri_key.into_bytes());
             let encrypted_pri = encrypt(&password, &pri_key_bytes)?;
             // Store to DB
@@ -864,9 +868,10 @@ impl KeyVault {
                 pub_key: encode(pub_key.into_bytes()),
                 pri_enc: encrypted_pri,
             };
+            pub_keys.push(encode(pub_key_clone.into_bytes()));
 
             add_key_pair(pair).await.map_err(|e| e.to_jsvalue())?;
         }
-        Ok(())
+        Ok(pub_keys)
     }
 }

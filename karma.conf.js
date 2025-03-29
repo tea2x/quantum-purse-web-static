@@ -1,3 +1,4 @@
+const path = require('path');
 module.exports = function (config) {
   config.set({
     frameworks: ["mocha"],
@@ -34,10 +35,17 @@ module.exports = function (config) {
             test: /\.wasm$/,
             type: "asset/resource",
           },
+          {
+            test: /\.toml$/,
+            use: "file-loader",
+          },
         ],
       },
       resolve: {
         extensions: [".ts", ".js"],
+        alias: {
+          'ckb-light-client-js': path.resolve(__dirname, 'tests/mock.ckb-light-client.js')
+        }
       },
     },
     mime: {

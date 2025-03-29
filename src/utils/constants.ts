@@ -1,3 +1,5 @@
+import { IS_MAIN_NET } from "../core/config";
+
 export const ROUTES = {
   HOME: "/",
   WELCOME: "/welcome",
@@ -31,4 +33,4 @@ export const PASSWORD_ENTROPY_THRESHOLDS = {
 
 export const CKB_DECIMALS = 100000000; // 1 CKB = 10^8 Shannons
 export const CKB_UNIT = "CKB";
-export const CKB_EXPLORER_URL = "https://testnet.explorer.nervos.org";
+export const CKB_EXPLORER_URL = IS_MAIN_NET ? "https://explorer.nervos.org" : "https://testnet.explorer.nervos.org";

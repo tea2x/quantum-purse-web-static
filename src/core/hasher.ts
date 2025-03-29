@@ -19,6 +19,7 @@ class CKBSphincsPlusHasher {
   hasher: Blake2b;
   outLength: number;
 
+  // Aligning with onchain hasher: https://github.com/xxuejie/quantum-resistant-lock-script/blob/bf2ab2a7a01a21c48d1151e0c488c66e0e4199c9/crates/ckb-fips205-utils/src/lib.rs#L104
   constructor(options: CKBHasherOptions = {}) {
     const { outLength = 32 } = options;
     this.outLength = outLength;

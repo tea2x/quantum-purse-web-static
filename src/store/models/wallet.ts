@@ -1,9 +1,7 @@
 import { createModel, init } from "@rematch/core";
 import { message, Modal } from "antd";
-import { NODE_URL } from "../../core/config";
 import Quantum from "../../core/quantum_purse";
-import { transfer } from "../../core/transaction_builder";
-import { bytesToUtf8, sendTransaction, utf8ToBytes } from "../../core/utils";
+import { bytesToUtf8, utf8ToBytes } from "../../core/utils";
 import { RootModel } from "./index";
 
 interface IAccount {
@@ -17,12 +15,20 @@ interface IWallet {
   active: boolean;
   current: IAccount;
   accounts: IAccount[];
+  syncStatus: {
+    connections: number;
+    syncedBlock: number;
+    tipBlock: number;
+    syncedStatus: number;
+    startBlock: number;
+  };
 }
 
 type StateType = IWallet;
 
 let isInitializing = false;
 export let quantum: Quantum;
+let syncStatusListener: ((status: any) => void) | null = null;
 
 const initState: StateType = {
   active: !localStorage.getItem("wallet-step"),
@@ -33,11 +39,21 @@ const initState: StateType = {
     sphincsPlusPubKey: "",
   },
   accounts: [],
+  syncStatus: {
+    connections: 0,
+    syncedBlock: 0,
+    tipBlock: 0,
+    syncedStatus: 0,
+    startBlock: 0,
+  },
 };
 
 export const wallet = createModel<RootModel>()({
   state: initState,
   reducers: {
+    setSyncStatus(state: StateType, syncStatus: any) {
+      return { ...state, syncStatus };
+    },
     setActive(state: StateType, active: boolean) {
       return { ...state, active };
     },
@@ -91,9 +107,17 @@ export const wallet = createModel<RootModel>()({
       isInitializing = true;
       quantum = await Quantum.getInstance();
       try {
+        await quantum.initLightClient();
+        // Setup listener for the light client status worker
+        syncStatusListener = (status) => {
+          this.setSyncStatus(status);
+        };
+        quantum.addSyncStatusListener(syncStatusListener);
+
         const accountsData: any = await this.loadAccounts();
         await quantum.setAccPointer(accountsData[0].sphincsPlusPubKey);
         this.setActive(true);
+
       } catch (error) {
         this.setActive(false);
         // throw error;
@@ -133,7 +157,7 @@ export const wallet = createModel<RootModel>()({
     },
     async createWallet({ password }) {
       try {
-        await quantum.init(utf8ToBytes(password));
+        await quantum.initSeedPhrase(utf8ToBytes(password));
         await quantum.genAccount(utf8ToBytes(password));
         this.loadCurrentAccount({});
       } catch (error) {
@@ -170,7 +194,7 @@ export const wallet = createModel<RootModel>()({
     },
     async send({ from, to, amount, password }, rootState) {
       try {
-        const tx = await transfer(from, to, amount);
+        const tx = await quantum.buildTransfer(from, to, amount);
         const fromSphincsPlusPubKey = rootState.wallet.accounts.find(
           (account) => account.address === from
         )?.sphincsPlusPubKey;
@@ -179,7 +203,7 @@ export const wallet = createModel<RootModel>()({
           utf8ToBytes(password),
           fromSphincsPlusPubKey
         );
-        const txId: string = await sendTransaction(NODE_URL, signedTx);
+        const txId: string = await quantum.sendTransaction(signedTx);
 
         if (
           from === rootState.wallet.current.address ||
@@ -194,7 +218,13 @@ export const wallet = createModel<RootModel>()({
     },
     async ejectWallet() {
       try {
-        await quantum.dbClear();
+
+        // remove light client sync status listener
+        if (syncStatusListener) {
+          quantum.removeSyncStatusListener(syncStatusListener);
+          syncStatusListener = null;
+        }
+        await quantum.deleteWallet();
         this.reset();
       } catch (error) {
         throw error;

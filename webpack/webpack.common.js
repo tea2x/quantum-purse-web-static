@@ -63,6 +63,10 @@ module.exports = {
           "sass-loader",
         ],
       },
+      {
+        test: /\.toml$/,
+        use: "file-loader",
+      },
     ],
   },
   resolve: {
