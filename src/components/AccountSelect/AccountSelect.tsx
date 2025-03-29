@@ -1,6 +1,7 @@
 import { Select, SelectProps } from "antd";
 import type { DefaultOptionType } from "antd/es/select";
 import { useAccountSearch } from "../../hooks/useAccountSearch";
+import { AccountItem } from "../../pages/Wallet/Wallet";
 
 export interface AccountOption {
   address?: string | null;
@@ -11,8 +12,6 @@ export interface AccountOption {
 
 interface CustomSelectProps {
   accounts: AccountOption[];
-  customOptionRender?: (option: AccountOption) => React.ReactNode;
-  customLabelRender?: (option: AccountOption) => React.ReactNode;
   onAccountChange?: (value: string, option: AccountOption) => void;
   debounceTime?: number;
   searchFields?: string[];
@@ -23,8 +22,6 @@ export type AccountSelectProps = CustomSelectProps &
 
 const AccountSelect: React.FC<AccountSelectProps> = ({
   accounts,
-  customOptionRender,
-  customLabelRender,
   onAccountChange,
   debounceTime = 300,
   searchFields,
@@ -37,24 +34,40 @@ const AccountSelect: React.FC<AccountSelectProps> = ({
   );
 
   const options = filteredAccounts.map((account) => ({
-    label: JSON.stringify(account),
+    label: JSON.stringify(account), // Serialize account data to string
     value: account.address,
-    data: account,
   }));
 
-  const optionRender = customOptionRender
-    ? (option: DefaultOptionType) => {
-        const accountData = option.data as AccountOption;
-        return customOptionRender(accountData);
-      }
-    : undefined;
+  // Render dropdown options
+  const optionRender = (option: DefaultOptionType) => {
+    if (!option.label) return null;
+    const accountData = JSON.parse(option.label as string) as AccountOption; // Deserialize account data from string
+    return (
+      <AccountItem
+        address={accountData.address!}
+        name={accountData.name}
+        sphincsPlusPubKey={accountData.sphincsPlusPubKey}
+        hasTools={false}
+        copyable={false}
+      />
+    );
+  };
 
-  const labelRender = customLabelRender
-    ? (option: DefaultOptionType) => {
-        const accountData = JSON.parse(option.label as string) as AccountOption;
-        return customLabelRender(accountData);
-      }
-    : undefined;
+  // Render selected account
+  const labelRender = (option: DefaultOptionType) => {
+    if (!option.label) return null;
+    const accountData = JSON.parse(option.label as string) as AccountOption; // Deserialize account data from string
+    return (
+      <AccountItem
+        address={accountData?.address!}
+        name={accountData?.name}
+        sphincsPlusPubKey={accountData?.sphincsPlusPubKey}
+        hasTools={false}
+        copyable={false}
+        showBalance={true}
+      />
+    );
+  };
 
   const handleChange = (value: string, option: any) => {
     if (onAccountChange) {

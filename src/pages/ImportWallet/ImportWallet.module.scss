@@ -1,9 +1,94 @@
 .importWallet {
-  :global {
-    padding: 3.6rem 3.6rem;
+  padding: 24px;
+  background: var(--white-abs);
+  max-width: 76.8rem;
+  margin: 0 auto;
+  padding: 3.6rem 3.6rem;
+  display: flex;
+  flex-direction: column;
+
+  h1 {
+    margin-bottom: 24px;
+    font-size: 24px;
+    font-weight: 600;
+    font-family: "Quantico", sans-serif;
+    text-transform: uppercase;
     text-align: center;
+  }
+
+  h2 {
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 600;
+  }
+
+  p {
+    font-size: 1.2rem;
+  }
+
+  :global {
+    .ant-steps {
+      margin-bottom: 24px;
+    }
+
+    .ant-steps-item-title {
+      font-size: 1.4rem;
+      font-weight: 500;
+    }
+
+    .ant-steps-item-description {
+      font-size: 1.2rem;
+      line-height: 1.2;
+      color: rgba(0, 0, 0, 0.45);
+      max-width: unset;
+    }
+
+    button[type="submit"],
+    .next-button {
+      display: block;
+      margin: 0 auto;
+    }
+  }
+}
+
+.stepCreatePassword {
+  button[type="submit"] {
+    display: block;
+    margin: 0 auto;
+  }
+}
+
+.stepSecureSRP {
+  :global {
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 0.8rem;
+    // h2 {
+    //   margin-bottom: 0.8rem;
+    // }
+    .srp {
+      margin: 0.8rem 0;
+      padding: 1.2rem;
+      border-radius: 1.2rem;
+      border: 0.1rem solid var(--gray-light);
+      // max-width: 40rem;
+      text-align: center;
+    }
+  }
+}
+
+.tabs {
+  flex: 1;
+  max-width: 50rem;
+  margin: 0 auto;
+}
+
+.stepInputSRP {
+  h2 {
+    margin-bottom: 1.6rem;
+  }
+  textarea {
+    text-align: center;
   }
 }

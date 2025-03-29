@@ -8,8 +8,10 @@ import styles from "./Layout.module.scss";
 type AuthLayoutProps = React.HTMLAttributes<HTMLDivElement>;
 
 const InactiveLayout: React.FC<AuthLayoutProps> = ({ ...rest }) => {
-  const wallet = useSelector((state: RootState) => state.wallet);
-  if (wallet.active) {
+  const { loading, wallet } = useSelector((state: RootState) => state);
+  const { global: loadingGlobal } = loading;
+
+  if (wallet.current.address && !loadingGlobal) {
     return <Navigate to={ROUTES.WALLET} />;
   }
 

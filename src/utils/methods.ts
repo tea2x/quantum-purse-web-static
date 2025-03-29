@@ -26,3 +26,15 @@ export const formatBalance = (balance: string | bigint | undefined) => {
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, ",")} ${CKB_UNIT}`;
 };
+
+export const formatError = (error: any) => {
+  let description = "Something went wrong";
+
+  if (String(error) === "Decryption error: Error") {
+    description = "Invalid password";
+  } else if (String(error) === "Error: Insufficient balance!") {
+    description = "Insufficient balance";
+  }
+
+  return description;
+};

@@ -1,4 +1,4 @@
-.ejectWallet {
+.revealSRP {
   display: flex;
   flex-direction: column;
   .content {
@@ -7,13 +7,9 @@
     align-items: center;
     justify-content: center;
     gap: 1.6rem;
-    height: 70%;
-    p {
-      font-size: 1.4rem;
-      text-align: center;
-    }
-    button {
-      width: fit-content;
-    }
+    padding: 2rem 0;
+    width: 100%;
+    max-width: 50rem;
+    margin: 0 auto;
   }
 }

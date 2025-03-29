@@ -49,7 +49,7 @@ const items: MenuItem[] = [
     children: [
       {
         key: ROUTES.SETTINGS.REVEAL_SRP,
-        label: <NavLink to={ROUTES.COMING_SOON}>Reveal SRP</NavLink>,
+        label: <NavLink to={ROUTES.SETTINGS.REVEAL_SRP}>Reveal SRP</NavLink>,
       },
       {
         key: ROUTES.SETTINGS.EJECT_WALLET,

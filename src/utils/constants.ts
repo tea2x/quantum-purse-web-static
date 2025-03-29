@@ -32,3 +32,20 @@ export const PASSWORD_ENTROPY_THRESHOLDS = {
 export const CKB_DECIMALS = 100000000; // 1 CKB = 10^8 Shannons
 export const CKB_UNIT = "CKB";
 export const CKB_EXPLORER_URL = "https://testnet.explorer.nervos.org";
+
+export const STORAGE_KEYS = {
+  WALLET_STEP: "wallet-step",
+  CURRENT_ACCOUNT_SPHINC: "current-account-sphinc",
+};
+
+export const WALLET_STEP = {
+  PASSWORD: 1,
+  SRP: 2,
+};
+export const FIND_ACCOUNT_MAX_RETRIES = 20;
+export const FIND_ACCOUNT_THRESHOLD = 10;
+
+export type WalletStepEnum = (typeof WALLET_STEP)[keyof typeof WALLET_STEP];
+
+export const REPOSITORY_URL =
+  "https://github.com/tea2x/quantum-purse-web-static";

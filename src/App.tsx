@@ -13,6 +13,7 @@ import {
   EjectWallet,
   ImportWallet,
   Receive,
+  RevealSRP,
   Send,
   Wallet,
   Welcome,
@@ -29,7 +30,7 @@ const App: React.FC = () => {
     <Router basename={basename}>
       <Routes>
         <Route path={ROUTES.HOME} element={<InactiveLayout />}>
-          <Route index element={<Welcome />} />
+          <Route index element={<Navigate to={ROUTES.WELCOME} />} />
           <Route path={ROUTES.WELCOME} element={<Welcome />} />
           <Route path={ROUTES.CREATE_WALLET} element={<CreateWallet />} />
           <Route path={ROUTES.IMPORT_WALLET} element={<ImportWallet />} />
@@ -38,6 +39,7 @@ const App: React.FC = () => {
           <Route path={ROUTES.WALLET} element={<Wallet />} />
           <Route path={ROUTES.SEND} element={<Send />} />
           <Route path={ROUTES.RECEIVE} element={<Receive />} />
+          <Route path={ROUTES.SETTINGS.REVEAL_SRP} element={<RevealSRP />} />
           <Route
             path={ROUTES.SETTINGS.EJECT_WALLET}
             element={<EjectWallet />}

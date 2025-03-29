@@ -13,5 +13,28 @@
         margin-bottom: 1.6rem;
       }
     }
+    .forgot-password {
+      text-align: center;
+      width: fit-content;
+      margin: 1.6rem auto 0;
+      cursor: pointer;
+
+      transition: color 0.3s ease-in-out;
+
+      &:hover {
+        color: var(--teal-2);
+      }
+    }
+
+    .ant-modal-footer:has(.forgot-btn) {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+
+      .forgot-btn {
+        margin: 0;
+      }
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { addressToScript } from "@nervosnetwork/ckb-sdk-utils";
 import {
   Button,
   Flex,
@@ -5,7 +6,7 @@ import {
   Input,
   InputNumber,
   notification,
-  Select,
+  Spin,
   Switch,
 } from "antd";
 import { useEffect, useRef, useState } from "react";
@@ -17,48 +18,26 @@ import {
   Explore,
 } from "../../components";
 import { Dispatch, RootState } from "../../store";
-import { CKB_UNIT } from "../../utils/constants";
-import { cx } from "../../utils/methods";
-import { AccountItem } from "../Wallet/Wallet";
+import { CKB_DECIMALS, CKB_UNIT } from "../../utils/constants";
+import { cx, formatBalance, formatError } from "../../utils/methods";
 import styles from "./Send.module.scss";
-import { addressToScript } from "@nervosnetwork/ckb-sdk-utils";
+import { quantum } from "../../store/models/wallet";
 
 const Send: React.FC = () => {
   const [form] = Form.useForm();
   const values = Form.useWatch([], form);
   const [submittable, setSubmittable] = useState(false);
-  const [api, contextHolder] = notification.useNotification();
   const dispatch = useDispatch<Dispatch>();
   const authenticationRef = useRef<AuthenticationRef>(null);
-  const wallet = useSelector((state: RootState) => state.wallet);
+  const { wallet, loading } = useSelector((state: RootState) => state);
+  const { getAccountBalance: loadingGetAccountBalance } =
+    loading.effects.wallet;
   const { send: loadingSend } = useSelector(
     (state: RootState) => state.loading.effects.wallet
   );
-
-  const customOptionRender = (account: any) => {
-    return (
-      <AccountItem
-        address={account.data.address!}
-        name={account.data.name}
-        sphincsPlusPubKey={account.data.sphincsPlusPubKey}
-        hasTools={false}
-        copyable={false}
-      />
-    );
-  };
-
-  const customLabelRender = (account: any) => {
-    return (
-      <AccountItem
-        address={account?.address!}
-        name={account?.name}
-        sphincsPlusPubKey={account?.sphincsPlusPubKey}
-        hasTools={false}
-        copyable={false}
-        showBalance={true}
-      />
-    );
-  };
+  const [fromAccountBalance, setFromAccountBalance] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     form
@@ -71,33 +50,60 @@ const Send: React.FC = () => {
     try {
       const txId = await dispatch.wallet.send({ from, to, amount, password });
       form.resetFields();
-      api.success({
-        message: "Create account successfully",
+      notification.success({
+        message: "Send transaction successfully",
         description: (
           <div>
-            <p>Send transaction successfully</p>
+            <p>Please check the transaction on the explorer</p>
             <p>
               <Explore.Transaction txId={txId as string} />
             </p>
           </div>
         ),
-        placement: "bottomRight",
-        duration: 0,
       });
     } catch (error) {
-      console.info("Send transaction failed", error);
-      api.error({
+      notification.error({
         message: "Send transaction failed",
-        description: "Something went wrong",
-        placement: "bottomRight",
-        duration: 0,
+        description: formatError(error),
       });
     } finally {
       authenticationRef.current?.close();
     }
   };
 
-  console.log(values);
+  useEffect(() => {
+    form.setFieldsValue({
+      from: wallet.current.address,
+    });
+  }, [wallet.current.address]);
+
+  useEffect(() => {
+    const findFromAccountBalance = async () => {
+      const fromAccount = wallet.accounts.find(
+        (account) => account.address === values?.from
+      );
+
+      if (fromAccount?.sphincsPlusPubKey) {
+        const balance = await dispatch.wallet.getAccountBalance({
+          sphincsPlusPubKey: fromAccount.sphincsPlusPubKey,
+        });
+        setFromAccountBalance(balance);
+      }
+    };
+
+    if (values?.from) {
+      findFromAccountBalance();
+    }
+  }, [values?.from, wallet.accounts, dispatch.wallet]);
+
+  useEffect(() => {
+    if (fromAccountBalance !== null) {
+      form.validateFields(["from"]);
+      if (values?.amount) {
+        form.validateFields(["amount"]);
+      }
+    }
+  }, [fromAccountBalance, form]);
 
   return (
     <section className={cx(styles.wallet, "panel")}>
@@ -106,17 +112,43 @@ const Send: React.FC = () => {
         <Form layout="vertical" form={form} className={styles.sendForm}>
           <Form.Item
             name="from"
-            label="From"
-            rules={[{ required: true, message: "Please input an account" }]}
+            label={
+              <div className="from-label">
+                From{" "}
+                {fromAccountBalance && (
+                  <Spin spinning={loadingGetAccountBalance}>
+                    <p className="from-balance">
+                      Balance: {formatBalance(fromAccountBalance)}
+                    </p>
+                  </Spin>
+                )}
+              </div>
+            }
+            rules={[
+              { required: true, message: "Please input an account" },
+              {
+                validator: (_, value) => {
+                  if (
+                    fromAccountBalance &&
+                    BigInt(fromAccountBalance) < BigInt(73 * 100000000)
+                  ) {
+                    return Promise.reject(
+                      "This account has insufficient balance. The balance must be greater than 73 CKB"
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
+            dependencies={["from"]}
             className={"field-from select-my-account"}
           >
             <AccountSelect
               accounts={wallet.accounts}
-              customOptionRender={customOptionRender}
-              customLabelRender={customLabelRender}
               placeholder="Please select account from your wallet"
             />
           </Form.Item>
+
           <Form.Item
             name="to"
             label={
@@ -159,8 +191,6 @@ const Send: React.FC = () => {
             ) : (
               <AccountSelect
                 accounts={wallet.accounts}
-                customOptionRender={customOptionRender}
-                customLabelRender={customLabelRender}
                 placeholder="Please select account from your wallet"
               />
             )}
@@ -175,10 +205,22 @@ const Send: React.FC = () => {
                 min: 73,
                 message: "Amount must be at least 73 CKB",
               },
+              {
+                validator: (_, value) => {
+                  if (
+                    fromAccountBalance &&
+                    value &&
+                    BigInt(fromAccountBalance) / BigInt(CKB_DECIMALS) <
+                      BigInt(value)
+                  ) {
+                    return Promise.reject("Insufficient balance");
+                  }
+                  return Promise.resolve();
+                },
+              },
             ]}
           >
             <InputNumber
-              min={73}
               step={1}
               addonAfter={CKB_UNIT}
               controls
@@ -201,12 +243,11 @@ const Send: React.FC = () => {
         <Authentication
           ref={authenticationRef}
           loading={loadingSend}
-          authenCallback={(password) => {
-            onFinish({ ...values, password });
+          authenCallback={async (password) => {
+            await onFinish({ ...values, password });
           }}
         />
       </div>
-      {contextHolder}
     </section>
   );
 };

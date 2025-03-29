@@ -3,7 +3,6 @@ import {
   GlobalOutlined,
   MoreOutlined,
   QrcodeOutlined,
-  SwapOutlined,
 } from "@ant-design/icons";
 import {
   Button,
@@ -17,7 +16,7 @@ import {
   Spin,
   Tag,
 } from "antd";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   AccountDetail,
@@ -28,7 +27,7 @@ import {
 } from "../../components";
 import { useAccountSearch } from "../../hooks/useAccountSearch";
 import { Dispatch, RootState } from "../../store";
-import { cx, shortenAddress } from "../../utils/methods";
+import { cx, formatError, shortenAddress } from "../../utils/methods";
 import styles from "./Wallet.module.scss";
 
 const Wallet: React.FC = () => {
@@ -44,16 +43,11 @@ const Wallet: React.FC = () => {
     useAccountSearch(wallet.accounts);
 
   const authenticationRef = useRef<AuthenticationRef>(null);
-  const [api, contextHolder] = notification.useNotification();
-
-  useEffect(() => {
-    dispatch.wallet.loadAccounts();
-  }, [dispatch.wallet]);
 
   const createAccountHandler = async (password: string) => {
     try {
       const newAccount = await dispatch.wallet.createAccount({ password });
-      api.success({
+      notification.success({
         message: "Create account successfully",
         description: (
           <div>
@@ -63,15 +57,12 @@ const Wallet: React.FC = () => {
             </Explore.Account>
           </div>
         ),
-        placement: "bottomRight",
-        duration: 0,
       });
       authenticationRef.current?.close();
     } catch (error) {
-      api.error({
+      notification.error({
         message: "Failed to create account",
-        description: error instanceof Error ? error.message : "Unknown error",
-        placement: "bottomRight",
+        description: formatError(error),
       });
     }
   };
@@ -88,22 +79,20 @@ const Wallet: React.FC = () => {
 
     return (
       <ul className="account-list">
-        {filteredAccounts.map(
-          ({ address, name, sphincsPlusPubKey, balance }, index) => (
-            <>
-              {index > 0 && (
-                <Divider className="divider" key={`divider-${index}`} />
-              )}
-              <AccountItem
-                key={sphincsPlusPubKey}
-                address={address!}
-                name={name}
-                sphincsPlusPubKey={sphincsPlusPubKey}
-                isLoading={loadingSwitchAccount}
-              />
-            </>
-          )
-        )}
+        {filteredAccounts.map(({ address, name, sphincsPlusPubKey }, index) => (
+          <React.Fragment key={sphincsPlusPubKey}>
+            {index > 0 && (
+              <Divider className="divider" key={`divider-${index}`} />
+            )}
+            <AccountItem
+              key={sphincsPlusPubKey}
+              address={address!}
+              name={name}
+              sphincsPlusPubKey={sphincsPlusPubKey}
+              isLoading={loadingSwitchAccount}
+            />
+          </React.Fragment>
+        ))}
       </ul>
     );
   };
@@ -145,7 +134,6 @@ const Wallet: React.FC = () => {
         loading={loadingCreateAccount}
         authenCallback={createAccountHandler}
       />
-      {contextHolder}
     </section>
   );
 };
@@ -174,92 +162,97 @@ export const AccountItem: React.FC<AccountItemProps> = ({
   const wallet = useSelector((state: RootState) => state.wallet);
   const isActive = sphincsPlusPubKey === wallet.current.sphincsPlusPubKey;
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] =
+    useState(false);
   const menuOptions = useMemo(
-    () =>
-      [
-        {
-          key: "switch-account",
-          label: (
-            <p className="menu-item">
-              <SwapOutlined />
-              Switch Account
-            </p>
-          ),
-          onClick: () => {
-            dispatch.wallet.switchAccount({ sphincsPlusPubKey });
-          },
-          hidden: isActive,
-          disabled: isLoading,
-        },
-        {
-          key: "view-details",
-          label: (
-            <p className="menu-item">
-              <QrcodeOutlined />
-              View Details
-            </p>
-          ),
-          onClick: () => setIsModalOpen(true),
-        },
-        {
-          key: "explore",
-          label: (
-            <Explore.Account address={address} className="menu-item">
-              <GlobalOutlined />
-              Explore
-            </Explore.Account>
-          ),
-        },
-      ].filter((item) => !item.hidden),
+    () => [
+      {
+        key: "view-details",
+        label: (
+          <p className="menu-item">
+            <QrcodeOutlined />
+            View Details
+          </p>
+        ),
+        onClick: () => setIsModalOpen(true),
+      },
+      {
+        key: "explore",
+        label: (
+          <Explore.Account address={address} className="menu-item">
+            <GlobalOutlined />
+            Explore
+          </Explore.Account>
+        ),
+      },
+    ],
     [isActive, sphincsPlusPubKey, address, isLoading, dispatch]
   );
 
   return (
-    <li {...props} className={cx(styles.accountItem)}>
-      <div className="account-info">
-        <p className="name">
-          {name}{" "}
-          {isActive && (
-            <Tag color="var(--teal-2)" className="current">
-              Current
-            </Tag>
-          )}
-          {isLoading &&
-            sphincsPlusPubKey === wallet.current.sphincsPlusPubKey && (
-              <Spin size="small" style={{ marginLeft: "8px" }} />
+    <>
+      <li {...props} className={cx(styles.accountItem)}>
+        <div
+          className="account-info"
+          onClick={() => setIsSwitchAccountModalOpen(true)}
+        >
+          <p className="name">
+            {name}{" "}
+            {isActive && (
+              <Tag color="var(--teal-2)" className="current">
+                Current
+              </Tag>
             )}
-        </p>
-        {copyable ? (
-          <Copy value={address} className="address copyable">
-            <span>{shortenAddress(address, 10, 20)}</span>
-            <CopyOutlined />
-          </Copy>
-        ) : (
-          <div className="address">{shortenAddress(address, 10, 20)}</div>
-        )}
-      </div>
-      <Flex gap={8} align="center">
-        {hasTools && (
-          <Dropdown
-            rootClassName={styles.accountUtils}
-            menu={{
-              items: menuOptions,
-            }}
-          >
-            <Button type="text" className="more-btn" disabled={isLoading}>
-              <MoreOutlined />
-            </Button>
-          </Dropdown>
-        )}
-      </Flex>
+          </p>
+          {copyable ? (
+            <Copy value={address} className="address copyable">
+              <span>{shortenAddress(address, 10, 20)}</span>
+              <CopyOutlined />
+            </Copy>
+          ) : (
+            <div className="address">{shortenAddress(address, 10, 20)}</div>
+          )}
+        </div>
+        <Flex gap={8} align="center">
+          {hasTools && (
+            <Dropdown
+              rootClassName={styles.accountUtils}
+              menu={{
+                items: menuOptions,
+              }}
+            >
+              <Button type="text" className="more-btn" disabled={isLoading}>
+                <MoreOutlined />
+              </Button>
+            </Dropdown>
+          )}
+        </Flex>
+      </li>
       <Modal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
+        centered
       >
         <AccountDetail account={{ name, address, sphincsPlusPubKey }} />
       </Modal>
-    </li>
+      {hasTools && (
+        <Modal
+          open={isSwitchAccountModalOpen}
+          onCancel={() => setIsSwitchAccountModalOpen(false)}
+          onOk={() => {
+            dispatch.wallet.switchAccount({ sphincsPlusPubKey });
+            setIsSwitchAccountModalOpen(false);
+          }}
+          title="Switch Account"
+          centered
+        >
+          <p>
+            Are you sure want to set <b>{name}</b> as current account?
+          </p>
+        </Modal>
+      )}
+    </>
   );
 };
 

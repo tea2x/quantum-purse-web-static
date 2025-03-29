@@ -1,0 +1,64 @@
+.srpTextBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  // max-width: 50rem;
+  margin: 0 auto;
+
+  h2.title {
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
+  }
+
+  p {
+    font-size: 1.4rem;
+    line-height: 1.5;
+    text-align: center;
+    max-width: 40rem;
+  }
+
+  .textBox {
+    margin: 0.8rem 0;
+    padding: 1.2rem;
+    border-radius: 1.2rem;
+    border: 0.1rem solid var(--gray-light);
+    width: 100%;
+    // max-width: 40rem;
+    background-color: var(--white-abs);
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: var(--gray-lighter);
+      border-color: var(--gray);
+    }
+
+    :global(.srp) {
+      margin: 0;
+      text-align: center;
+      word-break: break-word;
+      font-family: monospace;
+      font-size: 1.2rem;
+      line-height: 1.5;
+    }
+  }
+  form {
+    width: 100%;
+    max-width: 40rem;
+    margin-bottom: 1rem;
+
+    :global(.ant-form-item-control-input) {
+      width: 100%;
+    }
+
+    button {
+      width: fit-content;
+      display: block;
+      margin: 0 auto;
+    }
+  }
+}

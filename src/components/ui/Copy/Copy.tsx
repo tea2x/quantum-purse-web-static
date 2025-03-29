@@ -6,24 +6,18 @@ interface CopyProps extends React.HTMLAttributes<HTMLDivElement> {
   value: string;
 }
 
-const Copy: React.FC<CopyProps> = ({ value, children, className, ...rest }) => {
-  const [messageApi, contextHolder] = message.useMessage();
-
-  return (
-    <>
-      {contextHolder}
-      <div
-        {...rest}
-        className={cx(styles.copy, className)}
-        onClick={async () => {
-          await navigator.clipboard.writeText(value);
-          messageApi.success("Copied to clipboard");
-        }}
-      >
-        {children}
-      </div>
-    </>
-  );
-};
+const Copy: React.FC<CopyProps> = ({ value, children, className, ...rest }) => (
+  <div
+    {...rest}
+    className={cx(styles.copy, className)}
+    onClick={async (event: React.MouseEvent<HTMLDivElement>) => {
+      event.stopPropagation();
+      await navigator.clipboard.writeText(value);
+      message.success("Copied to clipboard");
+    }}
+  >
+    {children}
+  </div>
+);
 
 export default Copy;
