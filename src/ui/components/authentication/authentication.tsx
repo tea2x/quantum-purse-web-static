@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useState,
 } from "react";
-// import { TEMP_PASSWORD } from "../../utils/constants";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import usePasswordValidator from "../../hooks/usePasswordValidator";
@@ -30,7 +29,7 @@ const Authentication = React.forwardRef<AuthenticationRef, AuthenticationProps>(
     {
       authenCallback,
       title = "Authentication",
-      description = "Enter your password to proceed.",
+      description = "Enter your password to authorize this action.",
       loading,
       ...rest
     },
@@ -46,15 +45,20 @@ const Authentication = React.forwardRef<AuthenticationRef, AuthenticationProps>(
     const navigate = useNavigate();
 
     useEffect(() => {
-      form
-        .validateFields({ validateOnly: true })
-        .then(() => setSubmittable(true))
-        .catch(() => setSubmittable(false));
+      if (values?.password) {
+        form
+          .validateFields()
+          .then(() => setSubmittable(true))
+          .catch(() => setSubmittable(false));
+      } else {
+        setSubmittable(false);
+      }
     }, [form, values]);
 
     const closeHandler = () => {
       setOpen(false);
       setIsForgotPassword(false);
+      form.resetFields();
     };
 
     useImperativeHandle(ref, () => ({
@@ -76,12 +80,10 @@ const Authentication = React.forwardRef<AuthenticationRef, AuthenticationProps>(
               navigate(ROUTES.WELCOME);
             }
           : form.submit,
-        okClassname: isForgotPassword ? "forgot-btn" : "",
         cancelText: isForgotPassword ? "Back to Authentication" : "Cancel",
         onCancel: isForgotPassword
           ? () => setIsForgotPassword(false)
           : closeHandler,
-        cancelClassname: isForgotPassword ? "forgot-btn" : "",
         okDisabled: isForgotPassword ? false : !submittable,
       };
     }, [isForgotPassword, submittable]);
@@ -98,12 +100,10 @@ const Authentication = React.forwardRef<AuthenticationRef, AuthenticationProps>(
         className={styles.authentication}
         confirmLoading={loading}
         cancelButtonProps={{
-          className: modalOptions.cancelClassname,
           disabled: loading,
         }}
         closable={!loading}
         okButtonProps={{
-          className: modalOptions.okClassname,
           disabled: modalOptions.okDisabled,
         }}
       >
@@ -111,9 +111,7 @@ const Authentication = React.forwardRef<AuthenticationRef, AuthenticationProps>(
           <>
             <h2 className="title">Forgot Password?</h2>
             <p className="description">
-              Quantum Purse wallet does not store your password in somewhere.
-              You can only restore your wallet by using your secret recovery
-              phrase.
+              Restore your wallet by deleting current instance and reimport your secret recovery phrase.
             </p>
           </>
         ) : (

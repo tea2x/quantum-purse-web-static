@@ -10,6 +10,7 @@ module.exports = {
   output: {
     filename: "[name].[contenthash].js",
     path: path.resolve(__dirname, "../dist"),
+    publicPath: '/',
     clean: true,
   },
   devtool: "source-map",
@@ -71,6 +72,9 @@ module.exports = {
   },
   resolve: {
     extensions: [".tsx", ".ts", ".js", ".jsx"],
+    fallback: {
+      "stream": false
+    }
   },
   plugins: [
     new HtmlWebpackPlugin({

@@ -14,16 +14,16 @@ import { AccountSelect, Explore, Authentication, AuthenticationRef } from "../..
 import { Dispatch, RootState } from "../../store";
 import { CKB_DECIMALS, CKB_UNIT } from "../../utils/constants";
 import { cx, formatError } from "../../utils/methods";
-import styles from "./Send.module.scss";
+import styles from "./Deposit.module.scss";
 import QuantumPurse from "../../../core/quantum_purse";
 
-const Send: React.FC = () => {
+const Deposit: React.FC = () => {
   const [form] = Form.useForm();
   const values = Form.useWatch([], form);
   const [submittable, setSubmittable] = useState(false);
   const dispatch = useDispatch<Dispatch>();
   const wallet = useSelector((state: RootState) => state.wallet);
-  const { send: loadingSend } = useSelector(
+  const { deposit: loadingDeposit } = useSelector(
     (state: RootState) => state.loading.effects.wallet
   );
   const [fromAccountBalance, setFromAccountBalance] = useState<string | null>(null);
@@ -35,7 +35,7 @@ const Send: React.FC = () => {
 
   const quantumPurse = QuantumPurse.getInstance();
 
-  // Validate form fields to enable/disable the Send button
+  // Validate form fields to enable/disable the Deposit button
   useEffect(() => {
     form
       .validateFields({ validateOnly: true })
@@ -50,53 +50,12 @@ const Send: React.FC = () => {
         setPasswordResolver({ resolve, reject });
         authenticationRef.current?.open();
       };
-      // Cleanup when leaving send page
+      // Cleanup when leaving deposit page
       return () => {
         quantumPurse.requestPassword = undefined;
       };
     }
   }, [quantumPurse]);
-
-  const handleSend = async () => {
-    try {
-      const txId = await dispatch.wallet.send({
-        to: values.to,
-        amount: values.amount
-      });
-      form.resetFields();
-      notification.success({
-        message: "Send transaction successfully",
-        description: (
-          <div>
-            <p>Please check the transaction on the explorer</p>
-            <p>
-              <Explore.Transaction txId={txId as string} />
-            </p>
-          </div>
-        ),
-      });
-    } catch (error) {
-      notification.error({
-        message: "Send transaction failed",
-        description: formatError(error),
-      });
-    }
-  };
-
-  // Handle password submission and pass it to QPsigner::signOnlyTransaction
-  const authenCallback = async (password: string) => {
-    if (passwordResolver) {
-      passwordResolver.resolve(password);
-      setPasswordResolver(null);
-    }
-    authenticationRef.current?.close();
-  };
-
-  useEffect(() => {
-    form.setFieldsValue({
-      from: wallet.current.address,
-    });
-  }, [wallet.current.address]);
 
   // Fetch the account balance
   useEffect(() => {
@@ -112,7 +71,7 @@ const Send: React.FC = () => {
     getBalance();
   }, [wallet, dispatch]);
 
-  // pre-validate fields when balance updates
+  // Pre-validate fields when balance updates
   useEffect(() => {
     if (fromAccountBalance !== null) {
       form.validateFields(["from"]);
@@ -122,9 +81,44 @@ const Send: React.FC = () => {
     }
   }, [fromAccountBalance, form]);
 
+  const handleDeposit = async () => {
+    try {
+      const txId = await dispatch.wallet.deposit({
+        to: values.to,
+        amount: values.amount
+      });
+      form.resetFields();
+      notification.success({
+        message: "Deposit transaction successfully",
+        description: (
+          <div>
+            <p>Please check the transaction on the explorer</p>
+            <p>
+              <Explore.Transaction txId={txId as string} />
+            </p>
+          </div>
+        ),
+      });
+    } catch (error) {
+      notification.error({
+        message: "Deposit transaction failed",
+        description: formatError(error),
+      });
+    }
+  };
+
+  // Handle password submission and pass it to QPsigner::signOnlyTransaction
+  const authenCallback = async (password: string) => {
+    if (passwordResolver) {
+      passwordResolver.resolve(password);
+      setPasswordResolver(null);
+    }
+    authenticationRef.current?.close();
+  };
+
   return (
-    <section className={cx(styles.sendForm, "panel")}>
-      <h1>Send</h1>
+    <section className={cx(styles.depositForm, "panel")}>
+      <h1>Deposit</h1>
       <div>
         <Form layout="vertical" form={form}>
           <Form.Item
@@ -134,7 +128,7 @@ const Send: React.FC = () => {
                 To
                 <div className="switch-container">
                   My Account
-                  <Form.Item name="isSendToMyAccount" style={{ marginBottom: 0 }}>
+                  <Form.Item name="isDepositToMyAccount" style={{ marginBottom: 0 }}>
                     <Switch />
                   </Form.Item>
                 </div>
@@ -154,9 +148,9 @@ const Send: React.FC = () => {
                 },
               },
             ]}
-            className={cx("field-to", values?.isSendToMyAccount && "select-my-account")}
+            className={cx("field-to", values?.isDepositToMyAccount && "select-my-account")}
           >
-            {!values?.isSendToMyAccount ? (
+            {!values?.isDepositToMyAccount ? (
               <Input placeholder="Input the destination address" />
             ) : (
               <AccountSelect
@@ -171,7 +165,7 @@ const Send: React.FC = () => {
             label="Amount"
             rules={[
               { required: true, message: "Please input amount" },
-              { type: "number", min: 73, message: "Amount must be at least 73 CKB" },
+              { type: "number", min: 114, message: "Deposit amount must be at least 114 CKB" },
               {
                 validator: (_, value) => {
                   if (
@@ -197,11 +191,11 @@ const Send: React.FC = () => {
             <Flex justify="end">
               <Button
                 type="primary"
-                onClick={handleSend}
-                disabled={!submittable || loadingSend}
-                loading={loadingSend}
+                onClick={handleDeposit}
+                disabled={!submittable || loadingDeposit}
+                loading={loadingDeposit}
               >
-                Send
+                Deposit
               </Button>
             </Flex>
           </Form.Item>
@@ -209,7 +203,7 @@ const Send: React.FC = () => {
         <Authentication
           ref={authenticationRef}
           authenCallback={authenCallback}
-          title="Transferring CKB"
+          title="Deposit to Nervos DAO"
           afterClose={() => {
             if (passwordResolver) {
               passwordResolver.reject();
@@ -222,4 +216,4 @@ const Send: React.FC = () => {
   );
 };
 
-export default Send;
+export default Deposit;

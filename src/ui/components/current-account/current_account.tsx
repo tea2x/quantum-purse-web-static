@@ -21,7 +21,7 @@ const CurrentAccount: React.FC<CurrentAccountProps> = ({
       <p className="balance">{formatBalance(balance)}</p>
       {address && (
         <Copy value={address} className="address-utilities">
-          <p className="address">{shortenAddress(address)}</p>
+          <p className="address">{shortenAddress(address,6,6)}</p>
           <CopyOutlined className="copy-icon" />
         </Copy>
       )}

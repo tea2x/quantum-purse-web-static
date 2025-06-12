@@ -87,7 +87,7 @@ const AccountSelect: React.FC<AccountSelectProps> = ({
       labelRender={labelRender}
       onChange={handleChange}
       allowClear
-      placeholder="Please select account from your wallet"
+      placeholder="Please select an account from your wallet"
       {...restProps}
     />
   );

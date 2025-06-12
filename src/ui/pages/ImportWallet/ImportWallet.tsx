@@ -33,8 +33,6 @@ interface ImportWalletContext {
   prev: () => void;
 }
 
-const wallet = QuantumPurse.getInstance();
-
 const ImportWalletContext = createContext<ImportWalletContext>({
   currentStep: undefined,
   next: () => {},
@@ -259,9 +257,7 @@ const ImportWalletContent: React.FC = () => {
   const dispatch = useDispatch<Dispatch>();
 
   const onFinish = async ({parameterSet}:{parameterSet: SphincsVariant}) => {
-    if (parameterSet) {
-      wallet.initKeyVault(parameterSet);
-    }
+    QuantumPurse.getInstance().initKeyVault(parameterSet);
     // store chosen param set to storage, so wallet type retains when refreshed
     localStorage.setItem(STORAGE_KEYS.SPHINCS_PLUS_PARAM_SET, parameterSet.toString());
 

@@ -3,18 +3,25 @@ import { SrpTextBox } from "../../components";
 import { Dispatch, RootState } from "../../store";
 import { cx } from "../../utils/methods";
 import styles from "./RevealSRP.module.scss";
-import QuantumPurse from "../../../core/quantum_purse";
-
-const wallet = QuantumPurse.getInstance();
+import QuantumPurse, { SphincsVariant } from "../../../core/quantum_purse";
+import { STORAGE_KEYS } from "../../utils/constants";
 
 const RevealSRP: React.FC = () => {
   const dispatch = useDispatch<Dispatch>();
   const srp = useSelector((state: RootState) => state.wallet.srp);
+  const exportSrpHandler = async (password: string) => await dispatch.wallet.exportSRP({ password });
+  
+  let paramSet;
+  try {
+    paramSet = QuantumPurse.getInstance().getSphincsPlusParamSet();
+  } catch (e) {
+    const paramId = localStorage.getItem(STORAGE_KEYS.SPHINCS_PLUS_PARAM_SET);
+    paramSet = SphincsVariant[Number(paramId)];
+  }
 
-  const exportSrpHandler = async (password: string) =>
-    await dispatch.wallet.exportSRP({ password });
-
-  const description = "WARNING: Never copy or screenshot! Only handwrite to backup your chosen SPHINCS+ variant \"" + wallet.getSphincsPlusParamSet() + "\" with the mnemonic seed."
+  const description = 
+    "WARNING: Never copy or screenshot! Only handwrite to backup your chosen SPHINCS+ variant \"" 
+    + paramSet + "\" with the mnemonic seed.";
 
   return (
     <section className={cx(styles.revealSRP, "panel")}>

@@ -1,9 +1,10 @@
 import { createModel } from "@rematch/core";
 import { notification } from "antd";
-import Quantum from "../../../core/quantum_purse";
+import QuantumPurse from "../../../core/quantum_purse";
 import { bytesToUtf8, utf8ToBytes } from "../../../core/utils";
 import { FIND_ACCOUNT_THRESHOLD, STORAGE_KEYS } from "../../utils/constants";
 import { RootModel } from "./index";
+import { Hex } from "@ckb-ccc/core";
 
 interface IAccount {
   name: string;
@@ -30,7 +31,7 @@ interface IWallet {
 type StateType = IWallet;
 
 let isInitializing = false;
-export let quantum: Quantum;
+export let quantum: QuantumPurse;
 let syncStatusListener: ((status: any) => void) | null = null;
 
 const initState: StateType = {
@@ -95,7 +96,7 @@ export const wallet = createModel<RootModel>()({
         const accountsData = accounts.map((account, index) => ({
           name: `Account ${index + 1}`,
           spxLockArgs: account,
-          address: quantum.getAddress(account),
+          address: quantum.getAddress(account as Hex),
         }));
         this.setAccounts(accountsData);
         return accountsData;
@@ -106,11 +107,10 @@ export const wallet = createModel<RootModel>()({
     async init(_, rootState) {
       if (isInitializing) return;
       isInitializing = true;
-      quantum = await Quantum.getInstance();
 
       try {
+        quantum = QuantumPurse.getInstance();
         await quantum.initBackgroundServices();
-        
         // when refreshed, keyvault needs sphincs+ param set chosen by user
         const paramSet = localStorage.getItem(STORAGE_KEYS.SPHINCS_PLUS_PARAM_SET);
         paramSet && quantum.initKeyVault(Number(paramSet));
@@ -236,29 +236,37 @@ export const wallet = createModel<RootModel>()({
         throw error;
       }
     },
-    async send({ from, to, amount, password }, rootState) {
+    async send({ to, amount }, rootState) {
       try {
-        const tx = await quantum.buildTransfer(from, to, amount);
-        const fromSphincsPlusPubKey = rootState.wallet.accounts.find(
-          (account) => account.address === from
-        )?.spxLockArgs;
-        const signedTx = await quantum.sign(
-          tx,
-          utf8ToBytes(password),
-          fromSphincsPlusPubKey
-        );
-        const txId: string = await quantum.sendTransaction(signedTx);
-
-        if (
-          from === rootState.wallet.current.address ||
-          to === rootState.wallet.current.address
-        ) {
-          // Load current balance after sending transaction
-          // TODO: It's not working as expected because the blockchain transaction needs time to be confirmed
-          // TODO: We need to listen to the blockchain event and update the balance
-          this.loadCurrentAccount({});
-        }
-        return txId;
+        const txid = await quantum.transfer(to, amount);
+        // if (to === rootState.wallet.current.address) {
+        //   this.loadCurrentAccount({});
+        // }
+        return txid;
+      } catch (error) {
+        throw error;
+      }
+    },
+    async deposit({ to, amount }, rootState) {
+      try {
+        const txid = await quantum.daoDeposit(to, amount);
+        return txid;
+      } catch (error) {
+        throw error;
+      }
+    },
+    async withdraw({ to, depositCell, depositBlockNum, depositBlockHash }, rootState) {
+      try {
+        const txid = await quantum.daoWithdrawRequest(to, depositCell, depositBlockNum, depositBlockHash);
+        return txid;
+      } catch (error) {
+        throw error;
+      }
+    },
+    async unlock({ to, withdrawCell, depositBlockHash, withdrawingBlockHash }, rootState) {
+      try {
+        const txid = await quantum.daoUnlock(to, withdrawCell, depositBlockHash, withdrawingBlockHash);
+        return txid;
       } catch (error) {
         throw error;
       }
@@ -285,38 +293,38 @@ export const wallet = createModel<RootModel>()({
       try {
         await quantum.importSeedPhrase(utf8ToBytes(srp), utf8ToBytes(password));
 
-        let accountsLength = 1;
+        let consecutiveEmpty = 0;
+        let accountIndex = 0;
+        let lastAccountWithBalance = -1;
+        const batchSize = FIND_ACCOUNT_THRESHOLD;
 
-        const checkAccount = async (startIndex: number, limit: number) => {
+        while (consecutiveEmpty < batchSize) {
           const accounts = await quantum.genAccountInBatch(
             utf8ToBytes(password),
-            startIndex,
-            limit
+            accountIndex,
+            batchSize
           );
 
-          const accountsWithBalance = await Promise.all(
-            accounts.map(async (spxLockArgs) => {
-              const balance = await quantum.getBalance(spxLockArgs);
-              return { spxLockArgs, balance };
-            })
-          );
+          for (let i = 0; i < accounts.length; i++) {
+            const spxLockArgs = accounts[i];
+            const balance = await quantum.getBalance(spxLockArgs as Hex);
 
-          const lastAccountWithBalance = accountsWithBalance.reduceRight(
-            (lastIndex, account, currentIndex) =>
-              lastIndex === -1 && account.balance > BigInt(0)
-                ? currentIndex
-                : lastIndex,
-            -1
-          );
-
-          if (lastAccountWithBalance !== -1) {
-            accountsLength = startIndex + lastAccountWithBalance + 1;
-            await checkAccount(accountsLength + 1, limit);
+            if (balance > BigInt(0)) {
+              lastAccountWithBalance = accountIndex + i;
+              consecutiveEmpty = 0;
+            } else {
+              consecutiveEmpty++;
+              if (consecutiveEmpty >= batchSize) {
+                break;
+              }
+            }
           }
-        };
 
-        await checkAccount(0, FIND_ACCOUNT_THRESHOLD);
-        await quantum.recoverAccounts(utf8ToBytes(password), accountsLength);
+          accountIndex += batchSize;
+        }
+
+        const accountsToRecover = lastAccountWithBalance >= 0 ? lastAccountWithBalance + 1 : 1;
+        await quantum.recoverAccounts(utf8ToBytes(password), accountsToRecover);
 
         this.setActive(true);
       } catch (error) {

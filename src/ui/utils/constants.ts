@@ -12,8 +12,8 @@ export const ROUTES = {
   DAO: {
     HOME: "/dao",
     DEPOSIT: "/dao/deposit",
+    REQUEST_WITHDRAW: "/dao/request-withdraw",
     WITHDRAW: "/dao/withdraw",
-    UNLOCK: "/dao/unlock",
   },
   SETTINGS: {
     HOME: "/settings",
@@ -28,8 +28,6 @@ export const PASSWORD_ENTROPY_THRESHOLDS = {
   STRONG: 256,
   VERY_STRONG: 300,
 };
-
-// export const TEMP_PASSWORD = "akjsfhas98123)(&afj10239))(LKJL::MOQIWVNQQWOIJ";
 
 export const CKB_DECIMALS = 100000000; // 1 CKB = 10^8 Shannons
 export const CKB_UNIT = "CKB";

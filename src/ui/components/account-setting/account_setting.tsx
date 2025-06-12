@@ -9,6 +9,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../store";
 import QuantumPurse from "../../../core/quantum_purse";
 import { LightClientSetScriptsCommand } from "ckb-light-client-js";
+import { Hex } from "@ckb-ccc/core";
 
 interface AccountSettingProps {
   account: IAccount;
@@ -41,9 +42,8 @@ const AccountSetting: React.FC<AccountSettingProps> = ({ account }) => {
           <Button
             type="primary"
             onClick={async () => {
-              const wallet = await QuantumPurse.getInstance();
-              await wallet.setSellectiveSyncFilter(
-                [account.spxLockArgs],
+              await QuantumPurse.getInstance().setSellectiveSyncFilter(
+                [account.spxLockArgs as Hex],
                 [BigInt(startingBlock)],
                 LightClientSetScriptsCommand.Partial
               );

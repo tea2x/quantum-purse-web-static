@@ -1,4 +1,3 @@
-const path = require('path');
 module.exports = function (config) {
   config.set({
     frameworks: ["mocha"],
@@ -42,13 +41,22 @@ module.exports = function (config) {
         ],
       },
       resolve: {
-        extensions: [".ts", ".js"]
+        extensions: [".ts", ".js"],
+        fallback: {
+          "stream": false
+        }
       },
     },
     mime: {
       "application/wasm": ["wasm"],
     },
-    browsers: ["Chrome"],
+    browsers: ['ChromeWithFlags'],
+    customLaunchers: {
+      ChromeWithFlags: {
+        base: 'Chrome',
+        flags: ['--enable-features=SharedArrayBuffer'],
+      },
+    },
     singleRun: true,
     plugins: [
       "karma-mocha",

@@ -1,17 +1,17 @@
 // QuantumPurse.ts
-import { IS_MAIN_NET, SPHINCSPLUS_LOCK } from "./config";
-import { Reader } from "ckb-js-toolkit";
+import { IS_MAIN_NET, SPHINCSPLUS_LOCK, NERVOS_DAO, FEE_RATE } from "./config";
 import { scriptToAddress } from "@nervosnetwork/ckb-sdk-utils";
-import { Script, HashType, Address, Transaction, DepType, Cell } from "@ckb-lumos/base";
-import { TransactionSkeletonType, TransactionSkeleton, sealTransaction, addressToScript } from "@ckb-lumos/helpers";
-import { insertWitnessPlaceHolder, prepareSigningEntries, hexToByteArray } from "./utils";
+import { Address, DepType } from "@ckb-lumos/base";
+import { addressToScript } from "@ckb-lumos/helpers";
 import __wbg_init, { KeyVault, Util as KeyVaultUtil, SphincsVariant } from "quantum-purse-key-vault";
-import { LightClient, randomSecretKey, LightClientSetScriptsCommand, CellWithBlockNumAndTxIndex, ScriptStatus } from "ckb-light-client-js";
+import { randomSecretKey, LightClientSetScriptsCommand, ScriptStatus } from "ckb-light-client-js";
 import Worker from "worker-loader!../../light-client/status_worker.js";
 import testnetConfig from "../../light-client/network.test.toml";
 import mainnetConfig from "../../light-client/network.main.toml";
-import { ClientIndexerSearchKeyLike, Hex } from "@ckb-ccc/core";
+import { ClientIndexerSearchKeyLike, Hex, ccc, Cell, HashType, ScriptLike, Script, BytesLike, HashTypeLike } from "@ckb-ccc/core";
 import { Config, predefined, initializeConfig } from "@ckb-lumos/config-manager";
+import { getClaimEpoch, getProfit } from "./epoch";
+import { QPSigner } from "./ccc-adapter/signer";
 
 export { SphincsVariant } from "quantum-purse-key-vault";
 
@@ -20,11 +20,13 @@ export { SphincsVariant } from "quantum-purse-key-vault";
  * This class provides functionality for generating accounts, signing transactions,
  * managing cryptographic keys, and interacting with the blockchain.
  */
-export default class QuantumPurse {
+export default class QuantumPurse extends QPSigner {
   //**************************************************************************************//
   //*********************************** ATRIBUTES ****************************************//
   //**************************************************************************************//
   private static instance?: QuantumPurse;
+  private hasClientStarted: boolean = false;
+  
   /* CKB light client status worker */
   private worker: Worker | undefined;
   private pendingRequests: Map<
@@ -34,26 +36,16 @@ export default class QuantumPurse {
       reject: (reason: any) => void;
     }
   > = new Map();
-  private client?: LightClient;
   private syncStatusListeners: Set<(status: any) => void> = new Set();
   private static readonly CLIENT_SECRET = "ckb-light-client-wasm-secret-key";
   private static readonly START_BLOCK = "ckb-light-client-wasm-start-block";
-  /* Account management */
-  private keyVault?: KeyVault;
-  private sphincsPlusDep: { codeHash: string; hashType: HashType };
-  public accountPointer?: string; // Is a sphincs+ lock script argument
 
   //**************************************************************************************//
   //*************************************** METHODS **************************************//
   //**************************************************************************************//
   /** Constructor that takes sphincs+ on-chain binary deployment info */
-  private constructor(sphincsCodeHash: string, sphincsHashType: HashType) {
-    this.sphincsPlusDep = { codeHash: sphincsCodeHash, hashType: sphincsHashType };
-  }
-
-  /* init code for wasm-bindgen module */
-  private async initWasmBindgen(): Promise<void> {
-    await __wbg_init();
+  private constructor(scriptInfo: { codeHash: BytesLike, hashType: HashTypeLike }) {
+    super(scriptInfo);
   }
 
   /* init light client and status worker */
@@ -116,11 +108,11 @@ export default class QuantumPurse {
    * when accounts are created gradually via genAccount (when users want to create a new account)
   */
   private async setSellectiveSyncFilterInternal(
-    spxLockArgs: string,
+    spxLockArgs: Hex,
     firstAccount: boolean
   ): Promise<void> {
-    if (!this.client) {
-      console.error("Light client not initialized");
+    if (!this.hasClientStarted) {
+      console.error("Light client has not initialized");
       return Promise.resolve();
     }
 
@@ -138,8 +130,8 @@ export default class QuantumPurse {
 
   /* Calculate sync status */
   private async getSyncStatus() {
-    if (!this.client) {
-      console.error("Light client not initialized");
+    if (!this.hasClientStarted) {
+      console.error("Light client has not initialized");
       return {
         nodeId: "NULL",
         connections: 0,
@@ -189,7 +181,7 @@ export default class QuantumPurse {
 
   /* Start light client thread*/
   private async startLightClient() {
-    if (this.client !== undefined) return;
+    if (this.hasClientStarted) return;
 
     let secretKey = localStorage.getItem(QuantumPurse.CLIENT_SECRET);
     if (!secretKey) {
@@ -202,7 +194,6 @@ export default class QuantumPurse {
     }
 
     try {
-      this.client = new LightClient();
       const config = IS_MAIN_NET
         ? await (await fetch(mainnetConfig)).text()
         : await (await fetch(testnetConfig)).text();
@@ -212,6 +203,7 @@ export default class QuantumPurse {
         "info",
         "wss"
       );
+      this.hasClientStarted = true;
     } catch (error) {
       console.error("Failed to start light client:", error);
     }
@@ -219,8 +211,8 @@ export default class QuantumPurse {
 
   /* Fetch the sphincs+ celldeps to the light client in quantumPurse wallet setup */
   private async fetchSphincsPlusCellDeps() {
-    if (!this.client) {
-      console.error("Light client not initialized");
+    if (!this.hasClientStarted) {
+      console.error("Light client has not initialized");
       return;
     }
     await this.client.fetchTransaction(SPHINCSPLUS_LOCK.outPoint.txHash);
@@ -228,36 +220,28 @@ export default class QuantumPurse {
 
   /**
    * Gets the singleton instance of QuantumPurse.
-   * It seems key-vault initialization should be placed in a different init function.
-   * But Keyvault is too fused to QuantumPurse so for convenience, it is placed here.
-   * @returns The singleton instance of QuantumPurse.
+   * @returns The singleton instance of QuantumPurse if there is and create a new obj if there isn't.
    */
   public static getInstance() {
     if (!QuantumPurse.instance) {
-      QuantumPurse.instance = new QuantumPurse(
-        SPHINCSPLUS_LOCK.codeHash,
-        SPHINCSPLUS_LOCK.hashType as HashType
-      );
+      QuantumPurse.instance = new QuantumPurse({codeHash: SPHINCSPLUS_LOCK.codeHash, hashType: SPHINCSPLUS_LOCK.hashType});
     }
     return QuantumPurse.instance;
   }
 
-  /* init background service as wasm code and light client*/
+  /* init background service such as wasm bind-gen init code and light client*/
   public async initBackgroundServices(): Promise<void> {
-    await this.initWasmBindgen();
+    await this.initKeyVaultWBG();
     await this.initLightClient();
   }
 
   /**
-   * Fresh start a key-vault instance with a pre-determined SPHINCS variant.
+   * Init(and reinit) the Key Vault from QPSigner with a pre-determined SPHINCS variant.
    * @param variant The SPHINCS+ parameter set to start with
    * @returns void.
    */
   public initKeyVault(variant: SphincsVariant) {
-    if (this.keyVault) {
-      this.keyVault.free();
-    }
-    this.keyVault = new KeyVault(variant);
+    this.initKeyVaultCore(variant);
   }
 
   /* get the name of sphincs+ paramset of choice*/
@@ -277,26 +261,14 @@ export default class QuantumPurse {
   }
 
   /**
-   * Send the signed transaction via the light client.
-   * @param signedTx The signed CKB transaction
-   * @returns The transaction hash(id).
-   * @throws Error light client is not initialized.
-   */
-  public async sendTransaction(signedTx: Transaction): Promise<string> {
-    if (!this.client) throw new Error("Light client not initialized");
-    const txid = this.client.sendTransaction(signedTx);
-    return txid;
-  }
-
-  /**
    * Helper function tells the light client which account and from what block they start making transactions.
    * @param spxLockArgsArray The sphincs+ lock script arguments array (each correspond to 1 sphincs+ accounts in your DB).
    * @param startingBlocks The starting block array corresponding to the spxLockArgsArray to be set.
    * @param setMode The mode to set the scripts (All, Partial, Delete).
    * @throws Error light client is not initialized.
    */
-  public async setSellectiveSyncFilter(spxLockArgsArray: string[], startingBlocks: bigint[], setMode: LightClientSetScriptsCommand) {
-    if (!this.client) throw new Error("Light client not initialized");
+  public async setSellectiveSyncFilter(spxLockArgsArray: Hex[], startingBlocks: bigint[], setMode: LightClientSetScriptsCommand) {
+    if (!this.hasClientStarted) throw new Error("Light client has not initialized");
 
     if (spxLockArgsArray.length !== startingBlocks.length) {
       throw new Error("Length of spxLockArgsArray and startingBlocks must be the same");
@@ -322,7 +294,7 @@ export default class QuantumPurse {
    * @returns The CKB lock script (an asset lock in CKB blockchain).
    * @throws Error if no account pointer is set by default.
    */
-  public getLockScript(spxLockArgs?: string): Script {
+  public getLockScript(spxLockArgs?: BytesLike): ScriptLike {
     const accPointer =
       spxLockArgs !== undefined ? spxLockArgs : this.accountPointer;
     if (!accPointer || accPointer === "") {
@@ -332,8 +304,8 @@ export default class QuantumPurse {
     if (!this.keyVault) throw new Error("KeyVault not initialized!");
 
     return {
-      codeHash: this.sphincsPlusDep.codeHash,
-      hashType: this.sphincsPlusDep.hashType,
+      codeHash: this.spxLock.codeHash,
+      hashType: this.spxLock.hashType,
       args: "0x" + accPointer,
     };
   }
@@ -344,20 +316,20 @@ export default class QuantumPurse {
    * @returns The CKB address as a string.
    * @throws Error if no account pointer is set by default (see `getLockScript` for details).
    */
-  public getAddress(spxLockArgs?: string): string {
+  public getAddress(spxLockArgs?: BytesLike): string {
     const lock = this.getLockScript(spxLockArgs);
-    return scriptToAddress(lock, IS_MAIN_NET);
+    return scriptToAddress(Script.from(lock), IS_MAIN_NET);
   }
 
   /**
-   * Gets account balance via light client protocol.
+   * Gets account available (transferable) balance via light client protocol.
    * @param spxLockArgs - The sphincs+ lock script argument to form an address from which balance is retrieved, via light client.
    * @returns The account balance.
    * @throws Error light client is not initialized.
    */
-  public async getBalance(spxLockArgs?: string): Promise<bigint> {
-    if (!this.client) {
-      console.error("Light client not initialized");
+  public async getBalance(spxLockArgs?: Hex): Promise<bigint> {
+    if (!this.hasClientStarted) {
+      console.error("Light client has not initialized");
       return Promise.resolve(BigInt(0));
     }
 
@@ -365,45 +337,13 @@ export default class QuantumPurse {
     const searchKey: ClientIndexerSearchKeyLike = {
       scriptType: "lock",
       script: lock,
-      scriptSearchMode: "prefix"
+      scriptSearchMode: "prefix",
+      filter: {
+        outputDataLenRange: [0, 1]
+      }
     };
     const capacity = await this.client.getCellsCapacity(searchKey);
     return capacity;
-  }
-
-  /**
-   * Signs a Nervos CKB transaction using the SPHINCS+ signature scheme.
-   * @param tx - The transaction skeleton to sign.
-   * @param password - The password to decrypt the private key (will be zeroed out after use).
-   * @param spxLockArgs - The sphincs+ lock script arguments of the account that signs.
-   * @returns A promise resolving to the signed transaction.
-   * @throws Error if no account is set or decryption fails.
-   * @remark The password is overwritten with zeros after use.
-   */
-  public async sign(
-    tx: TransactionSkeletonType,
-    password: Uint8Array,
-    spxLockArgs?: string
-  ): Promise<Transaction> {
-    try {
-      const accPointer = spxLockArgs !== undefined ? spxLockArgs : this.accountPointer;
-      if (!accPointer || accPointer === "") {
-        throw new Error("Account pointer not available!");
-      }
-
-      if (!this.keyVault) {
-        throw new Error("KeyVault not initialized!");
-      }
-
-      tx = insertWitnessPlaceHolder(tx);
-      tx = prepareSigningEntries(tx);
-      const entry = tx.get("signingEntries").toArray();
-      const spxSig = await this.keyVault.sign(password, accPointer, hexToByteArray(entry[0].message));
-      const spxSigHex = new Reader(spxSig.buffer as ArrayBuffer).serializeJson();
-      return sealTransaction(tx, [spxSigHex]);
-    } finally {
-      password.fill(0);
-    }
   }
 
   /* Clears all local data of the wallet. */
@@ -431,22 +371,11 @@ export default class QuantumPurse {
         this.getAllLockScriptArgs(),
         this.keyVault.gen_new_account(password)
       ]);
-      await this.setSellectiveSyncFilterInternal(lockArgs, (lockArgsList.length === 0));
+      await this.setSellectiveSyncFilterInternal(lockArgs as Hex, (lockArgsList.length === 0));
       return lockArgs;
     } finally {
       password.fill(0);
     }
-  }
-
-  /**
-   * Sets the account pointer (There can be many sub/child accounts in db but at a time Quantum Purse will show just 1).
-   * @param accPointer - The SPHINCS+ lock script argument (as a pointer to the encrypted privatekey in DB) to set.
-   * @throws Error if the account to be set is not in the DB.
-   */
-  public async setAccountPointer(accPointer: string): Promise<void> {
-    const lockArgsList = await this.getAllLockScriptArgs();
-    if (!lockArgsList.includes(accPointer)) throw Error("Invalid account pointer");
-    this.accountPointer = accPointer;
   }
 
   /**
@@ -516,14 +445,6 @@ export default class QuantumPurse {
   }
 
   /**
-   * Retrieve all sphincs+ lock script arguments from all child accounts in the indexed DB.
-   * @returns An ordered array of all child key's sphincs+ lock script argument.
-   */
-  public async getAllLockScriptArgs(): Promise<string[]> {
-    return await KeyVault.get_all_sphincs_lock_args();
-  }
-
-  /**
    * Retrieve a list of on-the-fly sphincs+ lock script arguments for wallet recovery process.
    * @param password - The password to decrypt the master seed (will be zeroed out).
    * @param startIndex - The index to start searching from.
@@ -555,11 +476,10 @@ export default class QuantumPurse {
   public async recoverAccounts(password: Uint8Array, count: number): Promise<void> {
     try {
       if (!this.keyVault) throw new Error("KeyVault not initialized!");
-      const spxLockArgsList = await this.keyVault.recover_accounts(password, count);
+      const spxLockArgsList = await this.keyVault.recover_accounts(password, count) as Hex[];
 
-      if (!this.client) {
-        console.error("Light client not initialized");
-        return Promise.resolve();
+      if (!this.hasClientStarted) {
+        throw new Error("Light client has not initialized");
       }
 
       const startBlocksPromises = spxLockArgsList.map(async (lockArgs) => {
@@ -570,10 +490,16 @@ export default class QuantumPurse {
           scriptSearchMode: "prefix",
         };
 
-        const response = await this.client?.getTransactions(searchKey, "asc", 1);
+        const response = await this.client.getTransactions(searchKey, "asc", 1);
         let startBlock = BigInt(0);
-        if (response && response.transactions && response.transactions.length > 0) {
-          startBlock = response.transactions[0].blockNumber;
+        if (response) {
+          if (response.transactions && response.transactions.length > 0) {
+            // found the first transation, set to the block prior
+            startBlock = response.transactions[0].blockNumber - BigInt(1);
+          } else {
+            // no transaction found, meaning account empty -> set to tip block
+            startBlock = await this.client.getTip();
+          }
         }
         return startBlock;
       });
@@ -586,107 +512,227 @@ export default class QuantumPurse {
   }
 
   /**
-   * Assemble a CKB transfer transaction.
+   * CKB transfer from the current Quantum Purse address.
    *
-   * @param from - The sender's address.
    * @param to - The recipient's address.
    * @param amount - The amount to transfer in CKB.
-   * @returns A Promise that resolves to a TransactionSkeletonType object.
+   * @returns A Promise that resolves to a transaction hash when successful.
    * @throws Error if Light client is not ready / insufficient balance.
    */
-  public async buildTransfer(
-    from: Address,
+  public async transfer(
     to: Address,
     amount: string
-  ): Promise<TransactionSkeletonType> {
-    if (!this.client) throw new Error("Light client not initialized");
+  ): Promise<Hex> {
+    if (!this.hasClientStarted) throw new Error("Light client has not initialized");
+
+    const tx = ccc.Transaction.from({
+        outputs: [
+          {
+            lock: (await ccc.Address.fromString(to, this.client)).script,
+            capacity: ccc.fixedPointFrom(amount)
+          }
+        ]
+      }
+    );
+    
+    // cell deps
+    tx.addCellDeps([
+      {
+        outPoint: SPHINCSPLUS_LOCK.outPoint,
+        depType: SPHINCSPLUS_LOCK.depType as DepType,
+      }
+    ]);
+
+    await tx.completeInputsByCapacity(this);
+    await tx.completeFeeBy(this, FEE_RATE);
+    const hash = await this.sendTransaction(tx);
+    return hash;
+  }
+
+  /**
+   * Nervos DAO deposit.
+   * See https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md#deposit
+   * Reusing codes from NERVDAO project https://github.com/ckb-devrel/nervdao.
+   *
+   * @param to - The recipient's address.
+   * @param amount - The amount to deposit in CKB.
+   * @returns A Promise that resolves to a transaction hash when successful.
+   * @throws Error if Light client is not ready / insufficient balance.
+   */
+  public async daoDeposit(
+    to: Address,
+    amount: string
+  ): Promise<Hex> {
+    if (!this.hasClientStarted) throw new Error("Light client has not initialized");
 
     // initialize configuration
     let configuration: Config = IS_MAIN_NET ? predefined.LINA : predefined.AGGRON4;
     initializeConfig(configuration);
 
-    let txSkeleton = new TransactionSkeleton();
-    const transactionFee = BigInt(60000); // 60_000 shannons
-    const outputCapacity = BigInt(amount) * BigInt(1e8);
-    const minimalSphincsPlusCapacity = BigInt(73) * BigInt(1e8);
-    const requiredCapacity = transactionFee + outputCapacity + minimalSphincsPlusCapacity;
+    const tx = ccc.Transaction.from({
+      outputs: [
+        {
+          lock: addressToScript(to),
+          type: {
+            codeHash: NERVOS_DAO.codeHash,
+            hashType: NERVOS_DAO.hashType as HashType,
+            args: "0x",
+          },
+        },
+      ],
+      outputsData: ["00".repeat(8)],
+    });
 
-    // add sphics+ celldep
-    txSkeleton = txSkeleton.update("cellDeps", (cellDeps) =>
-      cellDeps.push({
+    if (tx.outputs[0].capacity > ccc.fixedPointFrom(amount)) {
+      throw(Error("Minimal deposit amount is " + ccc.fixedPointToString(tx.outputs[0].capacity)));
+    }
+    tx.outputs[0].capacity = ccc.fixedPointFrom(amount);
+
+    // cell deps
+    tx.addCellDeps([
+      {
         outPoint: SPHINCSPLUS_LOCK.outPoint,
         depType: SPHINCSPLUS_LOCK.depType as DepType,
-      })
-    );
-
-    // add input cells
-    const searchKey: ClientIndexerSearchKeyLike = {
-      scriptType: "lock",
-      script: addressToScript(from),
-      scriptSearchMode: "prefix",
-      filter: {
-        outputDataLenRange: [0, 1]
-      }
-    };
-    const collectedCells: CellWithBlockNumAndTxIndex[] = [];
-    let cursor: Hex | undefined;
-    let inputCapacity = BigInt(0);
-    cellCollecting: while (true) {
-      try {
-        const cells = await this.client.getCells(searchKey, "asc", 10, cursor);
-        if (cells.cells.length === 0) break cellCollecting;
-        cursor = cells.lastCursor as Hex;
-        for (const cell of cells.cells) {
-          if (inputCapacity >= requiredCapacity) break cellCollecting;
-          collectedCells.push(cell);
-          inputCapacity += BigInt(cell.cellOutput.capacity as string);
-        }
-      } catch (error) {
-        // error likely from getCells. todo check
-        console.error("Failed to fetch cells:", error);
-        break cellCollecting;
-      }
-    }
-
-    if (inputCapacity < requiredCapacity)
-      throw new Error("Insufficient balance!");
-
-    let inputCells: Cell[] = collectedCells.map(item => ({
-      cellOutput: {
-        ...item.cellOutput,
-        capacity: "0x" + item.cellOutput.capacity.toString(16)
       },
-      data: item.outputData,
-      outPoint: {
-        ...item.outPoint,
-        index: "0x" + item.outPoint.index.toString(16)
+      {
+        outPoint: NERVOS_DAO.outPoint,
+        depType: NERVOS_DAO.depType as DepType,
       }
-    } as Cell));
-    txSkeleton = txSkeleton.update("inputs", (i) => i.concat(inputCells));
+    ]);
 
-    // add the output cell
-    const output: Cell = {
-      cellOutput: {
-        capacity: "0x" + outputCapacity.toString(16),
+    await tx.completeInputsByCapacity(this);
+    await tx.completeFeeBy(this, FEE_RATE);
+    const hash = await this.sendTransaction(tx);
+    return hash;
+  }
+
+  /**
+   * Nervos DAO withdraw request.
+   * See https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md#withdraw-phase-1
+   * Reusing codes from NERVDAO project https://github.com/ckb-devrel/nervdao.
+   *
+   * @param to - The recipient's address.
+   * @param depositCell - The Nervos DAO deposit cell to make a withdraw request from.
+   * @returns A Promise that resolves to a transaction hash when successful.
+   * @throws Error if Light client is not ready / insufficient balance.
+   */
+  public async daoWithdrawRequest(
+    to: Address,
+    depositCell: Cell,
+    depositBlockNumber: bigint,
+    depositCellBlockHash: Hex
+  ): Promise<Hex> {
+    if (!this.hasClientStarted) throw new Error("Light client has not initialized");
+
+    // initialize configuration
+    let configuration: Config = IS_MAIN_NET ? predefined.LINA : predefined.AGGRON4;
+    initializeConfig(configuration);
+
+    if (depositCell.cellOutput.lock.occupiedSize != Script.from(addressToScript(to)).occupiedSize)
+      throw new Error("Desitnation Lock Script is different in size");
+
+    const tx = ccc.Transaction.from({
+      headerDeps: [depositCellBlockHash],
+      inputs: [{ previousOutput: depositCell.outPoint }],
+      outputs: [{
+        capacity: depositCell.cellOutput.capacity,
         lock: addressToScript(to),
-        type: undefined,
-      },
-      data: "0x",
-    };
-    txSkeleton = txSkeleton.update("outputs", (o) => o.push(output));
+        type: depositCell.cellOutput.type
+      }],
+      outputsData: [ccc.numLeToBytes(depositBlockNumber, 8)],
+    });
 
-    // add the change cell
-    const changeCapacity = inputCapacity - outputCapacity - transactionFee;
-    const changeCell: Cell = {
-      cellOutput: {
-        capacity: "0x" + changeCapacity.toString(16),
-        lock: addressToScript(from),
-        type: undefined,
+    // cell deps
+    tx.addCellDeps([
+      {
+        outPoint: SPHINCSPLUS_LOCK.outPoint,
+        depType: SPHINCSPLUS_LOCK.depType as DepType,
       },
-      data: "0x",
-    };
-    txSkeleton = txSkeleton.update("outputs", (o) => o.push(changeCell));
+      {
+        outPoint: NERVOS_DAO.outPoint,
+        depType: NERVOS_DAO.depType as DepType,
+      }
+    ]);
 
-    return txSkeleton;
+    await tx.completeInputsByCapacity(this);
+    await tx.completeFeeBy(this, FEE_RATE);
+    const hash = await this.sendTransaction(tx);
+    return hash;
+  }
+
+  /**
+   * Nervos DAO unlock (withdraw phase2).
+   * See https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md#withdraw-phase-2
+   * Reusing codes from NERVDAO project https://github.com/ckb-devrel/nervdao.
+   *
+   * @param to - The recipient's address.
+   * @param withdrawingCell - The Nervos DAO wightdrawing cell to be unlocked.
+   * @param depositBlockHash - The block hash of the deposit cell.
+   * @param withdrawingBlockHash - The block hash of the withdrawing cell.
+   * @returns A Promise that resolves to a transaction hash when successful.
+   * @throws Error if Light client is not ready / insufficient balance.
+   */
+  public async daoUnlock(
+    to: Address,
+    withdrawingCell: Cell,
+    depositBlockHash: Hex,
+    withdrawingBlockHash: Hex
+  ): Promise<Hex> {
+    if (!this.hasClientStarted) throw new Error("Light client has not initialized");
+
+    // initialize configuration
+    let configuration: Config = IS_MAIN_NET ? predefined.LINA : predefined.AGGRON4;
+    initializeConfig(configuration);
+
+    const [depositBlockHeader, withdrawBlockHeader] = await Promise.all([
+      this.client.getHeader(depositBlockHash),
+      this.client.getHeader(withdrawingBlockHash),
+    ]);
+
+    const tx = ccc.Transaction.from({
+      headerDeps: [withdrawingBlockHash, depositBlockHash],
+      inputs: [
+        {
+          previousOutput: withdrawingCell.outPoint,
+          since: {
+            relative: "absolute",
+            metric: "epoch",
+            value: ccc.epochToHex(getClaimEpoch(depositBlockHeader!, withdrawBlockHeader!)),
+          },
+        },
+      ],
+      outputs: [
+        {
+          lock: addressToScript(to),
+        },
+      ],
+      witnesses: [
+        ccc.WitnessArgs.from({
+          inputType: ccc.numLeToBytes(1, 8),
+        }).toBytes(),
+      ],
+    });
+
+    // cell deps
+    tx.addCellDeps([
+      {
+        outPoint: SPHINCSPLUS_LOCK.outPoint,
+        depType: SPHINCSPLUS_LOCK.depType as DepType,
+      },
+      {
+        outPoint: NERVOS_DAO.outPoint,
+        depType: NERVOS_DAO.depType as DepType,
+      }
+    ]);
+
+    await tx.completeInputsByCapacity(this);
+    await tx.completeFeeChangeToOutput(this, 0, FEE_RATE);
+
+    // adding output
+    const outputCapacity = getProfit(withdrawingCell, depositBlockHeader!, withdrawBlockHeader!);
+    tx.outputs[0].capacity += outputCapacity;
+
+    const hash = await this.sendTransaction(tx);
+    return hash;
   }
 }

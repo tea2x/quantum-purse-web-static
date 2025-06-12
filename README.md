@@ -19,7 +19,6 @@ Currently using an **under development** [CKB quantum resistant lockscript](http
 | **Password hashing** | Scrypt |
 | **RPC endpoint** | Not required |
 | **Light Client** | Supported (Chrome-based & Safari) |
-| **Nervos DAO** | Is coming! |
 
 ###### Overview
 <img width="628" alt="overview" src="https://github.com/user-attachments/assets/433a25dd-2845-4384-b9a3-e2374aac3227" />

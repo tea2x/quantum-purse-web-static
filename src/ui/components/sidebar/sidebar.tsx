@@ -34,17 +34,17 @@ const items: MenuItem[] = [
       {
         key: ROUTES.DAO.DEPOSIT,
         icon: <Icon.Deposit />,
-        label: <NavLink to={ROUTES.COMING_SOON}>Deposit</NavLink>,
+        label: <NavLink to={ROUTES.DAO.DEPOSIT}>Deposit</NavLink>,
+      },
+      {
+        key: ROUTES.DAO.REQUEST_WITHDRAW,
+        icon: <Icon.RequestWithdraw />,
+        label: <NavLink to={ROUTES.DAO.REQUEST_WITHDRAW}>Request Withdraw</NavLink>,
       },
       {
         key: ROUTES.DAO.WITHDRAW,
         icon: <Icon.Withdraw />,
-        label: <NavLink to={ROUTES.COMING_SOON}>Withdraw</NavLink>,
-      },
-      {
-        key: ROUTES.DAO.UNLOCK,
-        icon: <Icon.Unlock />,
-        label: <NavLink to={ROUTES.COMING_SOON}>Unlock</NavLink>,
+        label: <NavLink to={ROUTES.DAO.WITHDRAW}>Withdraw</NavLink>,
       },
     ],
   },
@@ -72,10 +72,28 @@ const items: MenuItem[] = [
   },
 ];
 
+const getDefaultOpenKeys = (pathname: string, items: MenuItem[]): string[] => {
+  for (const item of items) {
+    if (
+      item &&
+      "key" in item &&
+      typeof item.key === "string" &&
+      "children" in item &&
+      item.children
+    ) {
+      if (pathname.startsWith(item.key)) {
+        return [item.key];
+      }
+    }
+  }
+  return [];
+};
+
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 const Sidebar: React.FC<SidebarProps> = () => {
   const location = useLocation();
   const wallet = useSelector((state: RootState) => state.wallet);
+  const defaultOpenKeys = getDefaultOpenKeys(location.pathname, items);
 
   return (
     <nav className={cx("panel", styles.sidebar)}>
@@ -90,6 +108,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
         mode="inline"
         items={items}
         defaultSelectedKeys={[location.pathname]}
+        defaultOpenKeys={defaultOpenKeys}
       />
     </nav>
   );

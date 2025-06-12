@@ -23,8 +23,6 @@ import { CreateWalletContextType } from "./interface";
 import ParamSetSelectorForm from "../../components/sphincs-param-set/param_selector";
 import QuantumPurse, { SphincsVariant } from "../../../core/quantum_purse";
 
-const quantumPurse = QuantumPurse.getInstance();
-
 const CreateWalletContext = createContext<CreateWalletContextType>({
   currentStep: WALLET_STEP.PASSWORD,
   setCurrentStep: () => {},
@@ -148,7 +146,7 @@ export const StepCreatePassword: React.FC = () => {
     { password, parameterSet }: { password: string, parameterSet: SphincsVariant }
   ) => {
     if (parameterSet) {
-      quantumPurse.initKeyVault(parameterSet);
+      QuantumPurse.getInstance().initKeyVault(parameterSet);
     }
     // store chosen param set to storage, so wallet type retains when refreshed
     localStorage.setItem(STORAGE_KEYS.SPHINCS_PLUS_PARAM_SET, parameterSet.toString());
@@ -288,7 +286,7 @@ const StepSecureSRP: React.FC = () => {
       title={"Secure Secret Recovery Phrase"}
       description={
         srp
-          ? "WARNING: Never copy or screenshot! Only handwrite to backup your chosen SPHINCS+ variant \"" + quantumPurse.getSphincsPlusParamSet() + "\" with the mnemonic seed."
+          ? "WARNING: Never copy or screenshot! Only handwrite to backup your chosen SPHINCS+ variant \"" + QuantumPurse.getInstance().getSphincsPlusParamSet() + "\" with the mnemonic seed."
           : "Your wallet creation process has been interrupted. Please enter your password to reveal your SRP then follow through the process."
       }
       exportSrpHandler={exportSrpHandler}

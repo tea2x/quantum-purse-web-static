@@ -12,8 +12,8 @@ import Receive from "./svg/receive.svg?react";
 import Dao from "./svg/dao.svg?react";
 import Settings from "./svg/settings.svg?react";
 import Deposit from "./svg/deposit.svg?react";
+import RequestWithdraw from "./svg/request-withdraw.svg?react";
 import Withdraw from "./svg/withdraw.svg?react";
-import Unlock from "./svg/unlock.svg?react";
 import Eject from "./svg/eject.svg?react";
 import Reveal from "./svg/reveal.svg?react";
 
@@ -32,8 +32,8 @@ const Icon = {
   Dao,
   Settings,
   Deposit,
+  RequestWithdraw,
   Withdraw,
-  Unlock,
   Eject,
   Reveal,
 };

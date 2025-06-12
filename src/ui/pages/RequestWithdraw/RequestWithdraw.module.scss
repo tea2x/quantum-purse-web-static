@@ -1,11 +1,8 @@
-.sendForm {
+.withdrawForm {
   :global {
     background: rgba(255, 255, 255, 0.02);
     min-height: 41rem;
-    .ant-form {
-      background: rgba(255, 255, 255, 0) !important;
-    }
-    
+
     .ant-form-item {
       &.select-my-account {
         .ant-select-selector {
@@ -34,20 +31,47 @@
         }
       }
 
-      &.amount {
-        label {
-          color: var(--teal-2);
-        }
-      }
-
       .ant-input-number-group-addon {
         color: var(--teal-2);
       }
     }
+
     h1 {
       @media (max-width: 768px) {
         font-size: 2rem;
       }
     }
   }
+}
+
+.requestWithdrawListContainer {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.requestWithdrawList {
+  list-style: none;
+  padding: 0;
+}
+
+.depositItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  color: var(--gray-01);
+  font-size: 1.4rem;
+  @media (max-width: 768px) {
+    padding: 0.6rem 0.4rem;
+  }
+}
+
+.capacity {
+  font-weight: bold;
+  color: var(--gray-01);
+  white-space: nowrap;
+  border: 1px solid;
+  border-radius: 5px;
+  border-color: var(--gray-01);
+  padding: 0.8rem clamp(5rem, 30vw, 35rem) 0.8rem 2rem;
 }
