@@ -5,7 +5,6 @@ import { Address, DepType } from "@ckb-lumos/base";
 import { addressToScript } from "@ckb-lumos/helpers";
 import __wbg_init, { KeyVault, Util as KeyVaultUtil, SpxVariant } from "quantum-purse-key-vault";
 import { randomSecretKey, LightClientSetScriptsCommand, ScriptStatus } from "ckb-light-client-js";
-import Worker from "worker-loader!../../light-client/status_worker.js";
 import testnetConfig from "../../light-client/network.test.toml";
 import mainnetConfig from "../../light-client/network.main.toml";
 import { ClientIndexerSearchKeyLike, Hex, ccc, Cell, HashType, ScriptLike, Script, BytesLike, HashTypeLike } from "@ckb-ccc/core";
@@ -52,14 +51,22 @@ export default class QuantumPurse extends QPSigner {
   private async initLightClient(): Promise<void> {
     await this.startLightClient();
     await this.fetchSphincsPlusCellDeps();
-    this.startClientSyncStatusWorker();
+    await this.startClientSyncStatusWorker();
   }
 
   /** Initialize web worker to poll the sync status from the ckb light client */
-  private startClientSyncStatusWorker() {
+  private async startClientSyncStatusWorker() {
     if (this.worker !== undefined) return;
 
-    this.worker = new Worker();
+    const response = await fetch('status.worker.js');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch worker script: ${response.statusText}`);
+    }
+    const script = await response.text();
+    const blob = new Blob([script], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    this.worker = new Worker(workerUrl);
+
     this.worker!.onmessage = (event) => {
       const { command, data, requestId, type } = event.data;
       if (command === "getSyncStatus") {

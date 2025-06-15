@@ -1,4 +1,4 @@
-// This worker constantly every 5 seconds updates sync status to the UI via an interface provided by QuantumPurse class
+// This worker constantly every 1 seconds updates sync status to the UI via an interface provided by QuantumPurse class
 
 /* Function to request sync status from the main thread */
 function requestSyncStatus() {

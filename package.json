@@ -1,15 +1,39 @@
 {
   "name": "quantum-purse",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "CKB SPHINCS+ wallet",
   "private": true,
+  "main": "main.js",
   "scripts": {
     "start": "webpack serve --config ./webpack/webpack.dev.js",
     "build": "webpack --config ./webpack/webpack.prod.js",
     "rebuild": "rm -rf dist/ && npm run build",
     "test": "npx karma start",
-    "deploy": "npx gh-pages-clean && node ./src/deploy.js",
-    "predeploy": "DEPLOY_TARGET=gh-pages npm run build"
+    "start:electron": "DEPLOY_TARGET=electron npm run build && electron .",
+    "build:electron": "DEPLOY_TARGET=electron npm run rebuild && electron-builder --mac --win --linux"
+  },
+  "build": {
+    "appId": "com.example.quantum-purse",
+    "productName": "Quantum Purse",
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js"
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "src/ui/components/assets/logo.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "src/ui/components/assets/logo.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "src/ui/components/assets/logo.png"
+    }
   },
   "author": "tea2x",
   "license": "MIT",
@@ -31,8 +55,9 @@
     "compression-webpack-plugin": "^7.1.2",
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^5.2.7",
+    "electron": "^36.2.0",
+    "electron-builder": "^26.0.12",
     "file-loader": "^6.2.0",
-    "gh-pages": "^6.3.0",
     "html-webpack-plugin": "^5.3.1",
     "karma": "^6.4.4",
     "karma-chai": "^0.1.0",
@@ -52,8 +77,7 @@
     "webpack": "^5.27.1",
     "webpack-cli": "^4.5.0",
     "webpack-dev-server": "^4.15.2",
-    "webpack-merge": "^5.7.3",
-    "worker-loader": "^3.0.8"
+    "webpack-merge": "^5.7.3"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",

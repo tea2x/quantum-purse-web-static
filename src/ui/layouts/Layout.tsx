@@ -73,7 +73,7 @@ const Layout: React.FC<AuthLayoutProps> = ({
     <div className={cx(styles.layout, className)} {...rest}>
       <Header />
       <div className="container">{children}</div>
-      <Footer />
+      {/* <Footer /> */}
     </div>
   );
 };

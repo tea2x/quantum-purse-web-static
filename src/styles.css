@@ -137,7 +137,7 @@ body {
   margin: 0;
   background-color: var(--white);
   background-image: url("./ui/components/assets/background_blur.jpg");
-  background-size: cover;
+  /* background-size: cover; */
 }
 
 :root {
@@ -157,7 +157,7 @@ body {
 }
 
 .panel {
-  border-radius: 1.2rem;
+  border-radius: 0.5rem;
   overflow: hidden;
   background-color: var(--white-abs);
   box-shadow: 0 0.4rem 1.2rem rgba(0, 0, 0, 0.15);

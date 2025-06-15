@@ -34,11 +34,11 @@ module.exports = {
         test: /\.svg$/i,
         oneOf: [
           {
-            resourceQuery: /react/, // For SVGs imported with ?react query
+            resourceQuery: /react/,
             use: ['@svgr/webpack'],
           },
           {
-            type: "asset/resource", // For regular SVG imports
+            type: "asset/resource",
           }
         ],
       },
@@ -49,9 +49,7 @@ module.exports = {
       {
         test: /\.s[ac]ss$/i,
         use: [
-          // Creates `style` nodes from JS strings
           "style-loader",
-          // Translates CSS into CommonJS
           {
             loader: "css-loader",
             options: {
@@ -60,7 +58,6 @@ module.exports = {
               },
             },
           },
-          // Compiles Sass to CSS
           "sass-loader",
         ],
       },
@@ -81,7 +78,10 @@ module.exports = {
       template: "public/index.html",
     }),
     new CopyPlugin({
-      patterns: [{ from: "public/404.html", to: "404.html" }],
+      patterns: [
+        { from: "public/404.html", to: "404.html" },
+        { from: "public/status.worker.js", to: "status.worker.js" },
+      ],
     }),
   ],
   optimization: {
